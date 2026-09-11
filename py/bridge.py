@@ -98,7 +98,7 @@ def unit_to_tex(unit: str) -> str:
         # a lambda replacement avoids re.sub parsing the backslash in
         # \mathrm as an escape sequence
         t = re.sub(r"(?<![A-Za-z\{])" + word + r"(?![A-Za-z}])",
-                   lambda m, w=word: "\mathrm{" + w + "}", t)
+                   lambda m, w=word: r"\mathrm{" + w + "}", t)
     return t
 
 def list_models(category: str = "all") -> str:
