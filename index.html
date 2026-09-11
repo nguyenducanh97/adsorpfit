@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<link rel="stylesheet" href="css/marks.css?v=11">
-<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/marks.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=12">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -162,7 +162,10 @@
                 <input type="number" id="kin-C0" value="100" step="any"></label>
               <label class="field"><span class="lbl" data-i18n="lbl.dose">Adsorbent dose (g L⁻¹)</span>
                 <input type="number" id="kin-dose" value="1" step="any"></label>
-              <label class="field"><span class="lbl" data-i18n="lbl.radius">Particle radius (cm)</span>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.radius">Particle radius (cm)</span>
+                  <button type="button" class="field-info" data-help="radius"
+                    aria-label="What is this for?">?</button></span>
                 <input type="number" id="kin-radius" value="0.05" step="any">
                 <span class="sub" data-i18n="help.radius">For Boyd and Crank diffusion coefficients.</span></label>
             </div>
@@ -251,23 +254,21 @@
             <div class="row c2">
               <label class="field"><span class="lbl" data-i18n="lbl.temperature">Temperature (K)</span>
                 <input type="number" id="iso-T" value="298.15" step="0.01"></label>
-              <label class="field"><span class="lbl" data-i18n="lbl.mw">Molar mass (g mol⁻¹)</span>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.mw">Molar mass (g mol⁻¹)</span>
+                  <button type="button" class="field-info" data-help="mw"
+                    aria-label="What is this for?">?</button></span>
                 <input type="number" id="iso-MW" value="" step="any" placeholder="e.g. 194.19 for caffeine">
-                <span class="sub" data-i18n="help.mw">The molecular weight of the
-                  substance you are adsorbing, not the adsorbent. Two calculations
-                  need it: Dubinin–Radushkevich, whose mean free energy E only comes
-                  out in kJ/mol if C<sub>e</sub> is converted to mol/L, and the
-                  thermodynamics tab, which converts K<sub>L</sub> from L/mg to
-                  L/mol. Leave it blank if you are fitting neither; every other
-                  model ignores it.</span></label>
-              <label class="field"><span class="lbl" data-i18n="lbl.cs">Solubility C<sub>s</sub> (mg L⁻¹)</span>
+                <span class="sub" data-i18n="help.mwShort">Of the adsorbate, not the
+                  adsorbent. Only Dubinin–Radushkevich and the thermodynamics tab use
+                  it.</span></label>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.cs">Solubility C<sub>s</sub> (mg L⁻¹)</span>
+                  <button type="button" class="field-info" data-help="cs"
+                    aria-label="What is this for?">?</button></span>
                 <input type="number" id="iso-Cs" value="" step="any" placeholder="e.g. 43600 for methylene blue">
-                <span class="sub" data-i18n="help.cs">How much of your adsorbate
-                  dissolves in water before it saturates, at your temperature. Only
-                  the BET model uses it: BET describes layers stacking on top of each
-                  other, which only happens as C<sub>e</sub> approaches saturation,
-                  and its equation divides by (C<sub>s</sub> − C<sub>e</sub>). Look it
-                  up for your compound. Leave it blank unless you are fitting BET.</span></label>
+                <span class="sub" data-i18n="help.csShort">How much dissolves before
+                  the water saturates. Only the BET model uses it.</span></label>
               <label class="field"><span class="lbl" data-i18n="lbl.dose">Adsorbent dose (g L⁻¹)</span>
                 <input type="number" id="iso-dose" value="1" step="any"></label>
             </div>
@@ -423,12 +424,12 @@
 <!-- Bump APP_VERSION on every release. The ?v= query is what forces
      browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
      than serving a cached copy. -->
-<script>window.APP_VERSION = "11";</script>
-<script src="js/i18n.js?v=11"></script>
-<script src="js/prefs.js?v=11"></script>
-<script src="js/layout.js?v=11"></script>
-<script src="js/water.js?v=11"></script>
-<script src="js/plot.js?v=11"></script>
-<script src="js/app.js?v=11"></script>
+<script>window.APP_VERSION = "12";</script>
+<script src="js/i18n.js?v=12"></script>
+<script src="js/prefs.js?v=12"></script>
+<script src="js/layout.js?v=12"></script>
+<script src="js/water.js?v=12"></script>
+<script src="js/plot.js?v=12"></script>
+<script src="js/app.js?v=12"></script>
 </body>
 </html>
