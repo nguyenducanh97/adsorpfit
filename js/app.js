@@ -951,73 +951,162 @@
       });
   }
 
-  function buildTraceControls(cat, host) {
-    const st = STATE[cat];
-    host.innerHTML = "";
-    st.traceStyle = st.traceStyle || {};
+  /* ====================================================== series appearance */
 
-    function ctl(key, label, defaults) {
-      const ts = st.traceStyle[key] = st.traceStyle[key] || Object.assign({}, defaults);
-      const row = el("div", { class: "row c4", style: "align-items:end;margin-bottom:8px" }, [
-        el("div", {}, [
-          el("label", { class: "mini-label", text: label }),
-          el("label", { class: "inline-check", style: "margin:0" }, [
-            (function () {
-              const c = el("input", { type: "checkbox" });
-              c.checked = ts.show !== false;
-              c.onchange = function () { ts.show = c.checked; drawMainFigure(cat); };
-              return c;
-            })(), "show"
-          ])
-        ]),
-        (function () {
-          const w = el("div", {}, [el("label", { class: "mini-label", text: "colour" })]);
-          const i = el("input", { type: "color", value: ts.color });
-          i.oninput = function () { ts.color = i.value; drawMainFigure(cat); };
-          w.appendChild(i); return w;
-        })(),
-        (function () {
-          const w = el("div", {}, [el("label", { class: "mini-label",
-            text: ts.kind === "line" ? "dash" : "symbol" })]);
-          const s = el("select");
-          const opts = ts.kind === "line"
-            ? ["solid", "dash", "dot", "dashdot", "longdash"]
-            : Fig.SYMBOL_CYCLE.concat(["circle-open", "square-open", "diamond-open"]);
-          opts.forEach(function (o) {
-            const op = el("option", { value: o, text: o });
-            if ((ts.kind === "line" ? ts.dash : ts.symbol) === o) op.selected = true;
-            s.appendChild(op);
-          });
-          s.onchange = function () {
-            if (ts.kind === "line") ts.dash = s.value; else ts.symbol = s.value;
-            drawMainFigure(cat);
-          };
-          w.appendChild(s); return w;
-        })(),
-        (function () {
-          const w = el("div", {}, [el("label", { class: "mini-label",
-            text: ts.kind === "line" ? "width" : "size" })]);
-          const i = el("input", { type: "number", step: "0.1", min: "0.2", max: "12",
-            value: ts.kind === "line" ? ts.line_width : ts.marker_size });
-          i.oninput = function () {
-            if (ts.kind === "line") ts.line_width = Number(i.value);
-            else ts.marker_size = Number(i.value);
-            drawMainFigure(cat);
-          };
-          w.appendChild(i); return w;
-        })()
-      ]);
-      host.appendChild(row);
+  // One implementation of the per-series controls, shared by the kinetics,
+  // isotherm and thermodynamic figures so all three offer the same handles.
+  //
+  // `items` describes the rows: {key, label, defaults}. `store` holds the
+  // user's choices, keyed so they survive a redraw or a refit. `redraw` is
+  // called on every change.
+  function seriesControls(host, items, store, redraw) {
+    host.innerHTML = "";
+    if (!items.length) {
+      host.appendChild(el("p", { class: "tiny", style: "margin:0",
+                                 text: I18N.t("fig.noSeries") }));
+      return;
     }
 
-    ctl("__data__", "Experimental data",
-        { kind: "scatter", color: Fig.PALETTE[0], symbol: "circle",
-          marker_size: 5, show: true });
-    seriesFor(cat).forEach(function (m, i) {
-      ctl(m.model_key, m.model_name,
-          { kind: "line", color: Fig.PALETTE[(i + 1) % Fig.PALETTE.length],
-            dash: "solid", line_width: 1.6, show: i < 4 });
+    items.forEach(function (item) {
+      const ts = store[item.key] =
+        Object.assign({}, item.defaults, store[item.key] || {});
+      // the kind comes from the figure, never from stale stored state
+      ts.kind = item.defaults.kind;
+      const isLine = ts.kind === "line";
+
+      function field(labelKey, node) {
+        return el("div", {}, [
+          el("label", { class: "mini-label", text: I18N.t(labelKey) }), node
+        ]);
+      }
+
+      const showBox = el("input", { type: "checkbox" });
+      showBox.checked = ts.show !== false;
+      showBox.onchange = function () { ts.show = showBox.checked; redraw(); };
+
+      const colour = el("input", { type: "color", value: ts.color || "#0072B2" });
+      colour.oninput = function () { ts.color = colour.value; redraw(); };
+
+      const shape = el("select");
+      (isLine ? ["solid", "dash", "dot", "dashdot", "longdash"]
+              : Fig.SYMBOL_CYCLE.concat(["circle-open", "square-open",
+                                         "diamond-open", "triangle-up-open"]))
+        .forEach(function (o) {
+          const op = el("option", { value: o, text: o });
+          if ((isLine ? ts.dash : ts.symbol) === o) op.selected = true;
+          shape.appendChild(op);
+        });
+      shape.onchange = function () {
+        if (isLine) ts.dash = shape.value; else ts.symbol = shape.value;
+        redraw();
+      };
+
+      const size = el("input", {
+        type: "number", step: "0.1", min: "0.2", max: "16",
+        value: isLine ? (ts.line_width != null ? ts.line_width : 1.6)
+                      : (ts.marker_size != null ? ts.marker_size : 5)
+      });
+      size.oninput = function () {
+        const v = Number(size.value);
+        if (isLine) ts.line_width = v; else ts.marker_size = v;
+        redraw();
+      };
+
+      const row = el("div", { class: "row c4",
+                              style: "align-items:end;margin-bottom:8px" }, [
+        el("div", {}, [
+          el("label", { class: "mini-label", text: item.label, title: item.label }),
+          el("label", { class: "inline-check", style: "margin:0" },
+             [showBox, I18N.t("fig.show")])
+        ]),
+        field("fig.colour", colour),
+        field(isLine ? "fig.dash" : "fig.symbol", shape),
+        field(isLine ? "fig.width" : "fig.size", size)
+      ]);
+      host.appendChild(row);
+
+      // markers get an outline colour and error-bar width as well, which
+      // matter for publication figures and have nowhere else to live
+      if (!isLine) {
+        const edge = el("input", { type: "color",
+                                   value: ts.marker_edge || ts.color || "#0072B2" });
+        edge.oninput = function () { ts.marker_edge = edge.value; redraw(); };
+        const edgeW = el("input", { type: "number", step: "0.1", min: "0", max: "6",
+          value: ts.marker_edge_width != null ? ts.marker_edge_width : 1.2 });
+        edgeW.oninput = function () {
+          ts.marker_edge_width = Number(edgeW.value); redraw();
+        };
+        const cap = el("input", { type: "number", step: "0.5", min: "0", max: "12",
+          value: ts.capsize != null ? ts.capsize : 3 });
+        cap.oninput = function () { ts.capsize = Number(cap.value); redraw(); };
+        host.appendChild(el("div", { class: "row c4",
+                                     style: "align-items:end;margin-bottom:14px" }, [
+          el("div", {}),
+          field("fig.edge", edge),
+          field("fig.edgeWidth", edgeW),
+          field("fig.capsize", cap)
+        ]));
+      }
     });
+  }
+
+  // Fold the stored appearance choices into a figure's traces. Traces are
+  // matched by name, which is stable across redraws; index is the fallback
+  // for an unnamed trace.
+  function styledTraces(traces, store) {
+    store = store || {};
+    return traces.map(function (t, i) {
+      const s = store[t.name || ("series" + i)];
+      if (!s) return t;
+      const out = Object.assign({}, t);
+      if (s.color) out.color = s.color;
+      if (s.symbol) out.symbol = s.symbol;
+      if (s.dash) out.dash = s.dash;
+      if (s.marker_size != null) out.marker_size = s.marker_size;
+      if (s.line_width != null) out.line_width = s.line_width;
+      if (s.marker_edge) out.marker_edge = s.marker_edge;
+      if (s.marker_edge_width != null) out.marker_edge_width = s.marker_edge_width;
+      if (s.capsize != null) out.capsize = s.capsize;
+      out.visible = s.show !== false;
+      return out;
+    });
+  }
+
+  // Describe a figure's traces as rows for seriesControls.
+  function traceItems(traces) {
+    return traces.map(function (t, i) {
+      return {
+        key: t.name || ("series" + i),
+        label: t.name || ("series " + (i + 1)),
+        defaults: {
+          kind: t.kind === "line" ? "line" : "scatter",
+          color: t.color || Fig.PALETTE[i % Fig.PALETTE.length],
+          symbol: t.symbol || "circle",
+          dash: t.dash || "solid",
+          marker_size: t.marker_size != null ? t.marker_size : 6,
+          line_width: t.line_width != null ? t.line_width : 1.6,
+          show: true
+        }
+      };
+    });
+  }
+  function buildTraceControls(cat, host) {
+    const st = STATE[cat];
+    st.traceStyle = st.traceStyle || {};
+    const items = [{
+      key: "__data__", label: I18N.t("fig.experimental"),
+      defaults: { kind: "scatter", color: Fig.PALETTE[0], symbol: "circle",
+                  marker_size: 5, show: true }
+    }];
+    seriesFor(cat).forEach(function (m, i) {
+      items.push({
+        key: m.model_key, label: m.model_name,
+        defaults: { kind: "line",
+                    color: Fig.PALETTE[(i + 1) % Fig.PALETTE.length],
+                    dash: "solid", line_width: 1.6, show: i < 4 }
+      });
+    });
+    seriesControls(host, items, st.traceStyle, function () { drawMainFigure(cat); });
   }
 
   function buildTraces(cat) {
@@ -2215,6 +2304,12 @@
     };
   }
 
+  // carry the per-series appearance across a re-run, so a figure you have
+  // already styled is not reset when a fitting option changes
+  Object.keys(figs).forEach(function (k) {
+    figs[k].traceStyle = (prev[k] && prev[k].traceStyle) || {};
+  });
+
   STATE.thermo.figures = figs;
   STATE.thermo.traces = figs.vanthoff.traces;
   STATE.thermo.style = figs.vanthoff.style;
@@ -2385,20 +2480,25 @@
 
     setTimeout(function () {
 
-      Fig.draw("vh-plot", figs.vanthoff.traces, figs.vanthoff.style, theme());
+      Fig.draw("vh-plot", styledTraces(figs.vanthoff.traces, figs.vanthoff.traceStyle),
+               figs.vanthoff.style, theme());
       if (figs.isosteric) {
-        Fig.draw("iso-heat-plot", figs.isosteric.traces,
+        Fig.draw("iso-heat-plot",
+                 styledTraces(figs.isosteric.traces, figs.isosteric.traceStyle),
                  Object.assign({}, figs.isosteric.style, { height_cm: 6 }), theme());
       }
       if (figs.arrhenius) {
-        Fig.draw("arr-plot", figs.arrhenius.traces,
+        Fig.draw("arr-plot",
+                 styledTraces(figs.arrhenius.traces, figs.arrhenius.traceStyle),
                  Object.assign({}, figs.arrhenius.style, { height_cm: 6 }), theme());
       }
 
       if ($("#th-fig-preview")) {
         const pick = $("#th-figpick");
         const k = (pick && pick.value) || "vanthoff";
-        if (figs[k]) Fig.draw("th-fig-preview", figs[k].traces, figs[k].style, theme());
+        if (figs[k]) Fig.draw("th-fig-preview",
+                              styledTraces(figs[k].traces, figs[k].traceStyle),
+                              figs[k].style, theme());
       }
     }, 40);
   }
@@ -2426,18 +2526,24 @@
       return el("option", { value: k, text: figs[k].label });
     }));
     const styleHost = el("div", { class: "style-stack", id: "th-stylectl" });
+    const traceHost = el("div", { id: "th-tracectl" });
     const preview = el("div", { id: "th-fig-preview" });
 
     function refresh() {
-      const k = sel.value;
-      const f = STATE.thermo.figures[k];
-      Fig.draw("th-fig-preview", f.traces, f.style, theme());
-    }
-    sel.onchange = function () {
       const f = STATE.thermo.figures[sel.value];
+      if (!f) return;
+      Fig.draw("th-fig-preview", styledTraces(f.traces, f.traceStyle),
+               f.style, theme());
+    }
+    function rebuildPanels() {
+      const f = STATE.thermo.figures[sel.value];
+      if (!f) return;
+      f.traceStyle = f.traceStyle || {};
       Fig.buildControls(styleHost, f.style, refresh);
+      seriesControls(traceHost, traceItems(f.traces), f.traceStyle, refresh);
       refresh();
-    };
+    }
+    sel.onchange = rebuildPanels;
 
     const fmtSel = el("select", { id: "th-imgfmt" },
       IMAGE_FORMATS.map(function (f) {
@@ -2457,6 +2563,8 @@
           sel
         ]),
         preview,
+        el("div", { class: "section-title", text: I18N.t("fig.series") }),
+        traceHost,
         el("div", { class: "row c2", style: "margin-top:12px" }, [
           el("label", { class: "field" }, [
             el("span", { class: "lbl", text: I18N.t("lbl.format") }), fmtSel]),
@@ -2481,11 +2589,7 @@
       el("div", {}, [styleHost])
     ]);
 
-    setTimeout(function () {
-      const f = STATE.thermo.figures[sel.value];
-      Fig.buildControls(styleHost, f.style, refresh);
-      refresh();
-    }, 20);
+    setTimeout(rebuildPanels, 20);
     return shell;
   }
 
@@ -2494,7 +2598,8 @@
       const f = STATE.thermo.figures[key];
       if (!f) return;
       const style = Object.assign({}, f.style, { dpi: dpi || 600 });
-      const payload = Fig.toMatplotlib(f.traces, style, format || "png");
+      const payload = Fig.toMatplotlib(styledTraces(f.traces, f.traceStyle),
+                                       style, format || "png");
       payload.dpi = dpi || 600;
       toast(I18N.t("msg.rendering", { fmt: (format || "png").toUpperCase(),
                                       dpi: dpi || 600 }));
@@ -2660,6 +2765,15 @@
         models: $$("#iso-models input:checked").map(function (c) { return c.value; }),
         style: STATE.isotherm.style, traceStyle: STATE.isotherm.traceStyle
       },
+      thermoFigs: (function () {
+        // only the styling travels; traces are rebuilt from the data on load
+        const out = {};
+        Object.keys(STATE.thermo.figures || {}).forEach(function (k) {
+          const f = STATE.thermo.figures[k];
+          out[k] = { style: f.style, traceStyle: f.traceStyle };
+        });
+        return out;
+      })(),
       thermo: {
         model: $("#th-model").value, route: $("#th-route").value,
         MW: $("#th-MW").value,
@@ -2720,7 +2834,8 @@
       if ($(c === "kinetics" ? "#kin-data" : "#iso-data").value.trim()) readData(c);
     });
     STATE.thermo.result = null;
-    STATE.thermo.figures = null;
+    // seed the saved styling so the rebuilt figures pick it up through `prev`
+    STATE.thermo.figures = p.thermoFigs || null;
     $("#th-results").innerHTML = "";
 
     return replayView(p.view);
