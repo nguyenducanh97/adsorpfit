@@ -205,25 +205,6 @@ header.masthead {
   gap: 20px;
 }
 
-.brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
-
-.brand-mark {
-  width: 36px; height: 36px; flex: none;
-  border-radius: 11px;
-  background: linear-gradient(145deg, var(--aqua-400), var(--ocean-700));
-  display: grid; place-items: center;
-  box-shadow: var(--shadow-sm);
-}
-
-.brand-name {
-  font-size: 18px; font-weight: 700; letter-spacing: -0.35px;
-  color: var(--text); line-height: 1.1;
-}
-.brand-sub {
-  font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px;
-  text-transform: uppercase; font-weight: 600;
-}
-
 nav.tabs { display: flex; gap: 3px; margin-left: auto; flex-wrap: wrap; }
 
 nav.tabs button {
@@ -636,8 +617,6 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
    Masthead additions
    ========================================================================== */
 
-.brand-name b { color: var(--accent); font-weight: 700; }
-
 .masthead-tools { display: flex; gap: 6px; align-items: center; }
 
 .lang-switch {
@@ -652,16 +631,6 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 .lang-switch button[aria-pressed="true"] {
   background: var(--ocean-600); color: #fff;
 }
-
-footer.site-foot {
-  border-top: 1px solid var(--border);
-  margin-top: 36px; padding: 22px 18px 36px;
-  text-align: center; font-size: 12px; color: var(--text-muted);
-  background: var(--surface-glass);
-}
-footer.site-foot a { color: var(--accent); text-decoration: none; font-weight: 600; }
-footer.site-foot a:hover { text-decoration: underline; }
-footer.site-foot .fl { margin-bottom: 5px; }
 
 /* ==========================================================================
    Equations (KaTeX)
@@ -794,10 +763,9 @@ footer.site-foot .fl { margin-bottom: 5px; }
 :root[lang="ko"] button {
   font-family: "Noto Sans KR", "Malgun Gothic", var(--sans);
 }
-:root[lang="ko"] .brand-name,
 :root[lang="ko"] .mono,
-:root[lang="ko"] table.data td.num { font-family: var(--sans); }
-:root[lang="ko"] .brand-sub { letter-spacing: 0; }
+:root[lang="ko"] table.data td.num,
+:root[lang="ko"] table.data th.num { font-family: var(--mono); }
 
 /* ==========================================================================
    Manual layout control: column splitter, panel grips, plot resize
@@ -915,38 +883,13 @@ footer.site-foot .fl { margin-bottom: 5px; }
    them would not.
    ========================================================================== */
 
-.lab-mark {
-  display: inline-flex; align-items: center;
-  padding-left: 16px; margin-left: 4px;
-  border-left: 1px solid var(--border);
-  flex: none;
-}
-.lab-mark .mark { height: 26px; opacity: .9; transition: opacity .15s; }
-.lab-mark:hover .mark { opacity: 1; }
-@media (max-width: 1080px) { .lab-mark { display: none; } }
-
-.foot-marks {
-  display: flex; align-items: center; justify-content: center;
-  gap: 26px; flex-wrap: wrap;
-  margin-bottom: 16px; padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.foot-marks .mark { height: 34px; opacity: .82; transition: opacity .15s; }
-.foot-marks a:hover .mark { opacity: 1; }
+@media (max-width: 1080px) {  }
 
 /* The artwork is dark on transparency. On the dark theme it sits on a light
    plate rather than being inverted, which would wreck the brand colours. */
 :root[data-theme="dark"] .lab-mark .mark,
-:root[data-theme="dark"] .foot-marks .mark {
-  background-color: rgba(255, 255, 255, .93);
-  border-radius: 5px;
-  padding: 3px 8px;
-  box-sizing: content-box;
-}
-:root[data-theme="dark"] .lab-mark .mark { height: 22px; }
-
-footer.site-foot .fl { line-height: 1.65; max-width: 780px; margin: 0 auto 2px; }
-footer.site-foot .tiny { max-width: 780px; margin-left: auto; margin-right: auto; }
+:root[data-theme="dark"] 
+:root[data-theme="dark"] 
 
 /* ==========================================================================
    Toolbar buttons, focus mode and panel resizing
@@ -1029,3 +972,92 @@ footer.site-foot .tiny { max-width: 780px; margin-left: auto; margin-right: auto
 .proj-item.confirming .pn { color: var(--coral); font-weight: 700; }
 .btn.sm.danger:hover { background: color-mix(in srgb, var(--coral) 12%, transparent);
   border-color: var(--coral); color: var(--coral); }
+
+/* ==========================================================================
+   Brand, institutional marks and footer
+   Structure and proportions follow BrineFlow so the two tools read as one
+   family: the lab mark sits first in a white chip, a hairline rule separates
+   it from the wordmark, and the footer gathers all three marks and the
+   product line into a single bordered strip with the contact row beneath.
+   ========================================================================== */
+
+.brandwrap { display: flex; align-items: center; gap: 12px; position: relative; }
+
+.labchip {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 11px; border-radius: 11px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .18),
+              inset 0 0 0 1px rgba(255, 255, 255, .5);
+  transition: transform .2s, box-shadow .2s;
+  flex: none;
+}
+.labchip:hover { transform: translateY(-1px);
+                 box-shadow: 0 6px 22px rgba(55, 200, 207, .35); }
+.labchip .mark { height: 26px; }
+:root[data-theme="dark"] .labchip {
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .3),
+              inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+:root[data-motion="off"] .labchip:hover { transform: none; }
+
+.vr {
+  width: 1px; height: 30px; flex: none;
+  background: linear-gradient(transparent, rgba(140, 200, 220, .45), transparent);
+}
+
+.title h1 {
+  font-size: 19px; letter-spacing: .4px; font-weight: 700;
+  color: var(--text); line-height: 1.1; margin: 0;
+}
+.title h1 b { color: var(--accent); font-weight: 700; }
+.title p {
+  margin: 2px 0 0; font-size: 10.5px; letter-spacing: 1.3px;
+  text-transform: uppercase; color: var(--text-muted); font-weight: 600;
+}
+.ver {
+  font-size: 9.5px; letter-spacing: .8px; padding: 2px 6px; border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  vertical-align: middle; margin-left: 6px; font-weight: 700;
+}
+@media (max-width: 1080px) { .labchip, .brandwrap .vr { display: none; } }
+
+/* --- footer --------------------------------------------------------------- */
+
+footer.site-foot {
+  border-top: 1px solid var(--border);
+  margin-top: 36px; padding: 16px 20px 34px;
+  color: var(--text-muted); font-size: 11.5px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  background: var(--surface-glass);
+}
+footer.site-foot a { color: var(--accent); text-decoration: none; font-weight: 600; }
+footer.site-foot a:hover { text-decoration: underline; }
+
+.fbrand {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; justify-content: center;
+  padding: 10px 16px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.fbrand .mark { height: 24px; opacity: .95; transition: opacity .2s; }
+.fbrand a:hover .mark { opacity: 1; }
+.fbrand > span:last-child { line-height: 1.5; }
+
+/* The marks are dark artwork on transparency, so on the dark theme they get
+   the same white plate the header chip uses rather than being inverted. */
+:root[data-theme="dark"] .fbrand .mark {
+  background-color: rgba(255, 255, 255, .94);
+  border-radius: 7px; padding: 4px 9px; box-sizing: content-box;
+}
+
+.contact {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; justify-content: center; font-size: 11.8px;
+}
+.contact b { color: var(--text-2); font-weight: 650; }
+
+:root[lang="ko"] .title h1 { font-family: var(--sans); }
+:root[lang="ko"] .title p { letter-spacing: 0; }
