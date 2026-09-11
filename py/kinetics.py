@@ -83,7 +83,7 @@ def _interp_pfo(f, ctx):
         "Lagergren's model assumes the rate of uptake is proportional to the number "
         "of *unoccupied* sites, (q_e − q_t). Mechanistically that corresponds to "
         "adsorption controlled by physisorption onto a surface where the driving "
-        "force is simply the remaining free capacity — it does not imply a "
+        "force is simply the remaining free capacity; it does not imply a "
         "first-order chemical reaction.",
     ]
     q_obs = float(np.max(f.y))
@@ -96,7 +96,7 @@ def _interp_pfo(f, ctx):
                 f"A PFO fit whose q_e,cal disagrees badly with q_e,exp is the "
                 f"classic sign that the model is wrong for these data, no matter "
                 f"how good R² looks. Compare q_e,cal against q_e,exp for every "
-                f"kinetic model you report — this check catches more bad fits than "
+                f"kinetic model you report: this check catches more bad fits than "
                 f"R² does."
             )
         else:
@@ -123,7 +123,7 @@ PFO = ModelSpec(
     params=[
         ParamSpec("qe", "q_e,cal", "mg g⁻¹",
                   "Calculated equilibrium capacity. Compare it against the "
-                  "experimental q_e — disagreement condemns the fit.",
+                  "experimental q_e: disagreement condemns the fit.",
                   lower=1e-12, guess_fn=_qe_guess),
         ParamSpec("k1", "k₁", "min⁻¹",
                   "Pseudo-first-order rate constant. Sets the uptake timescale: "
@@ -164,13 +164,13 @@ def _interp_pso(f, ctx):
     f.derived["t_half"] = t_half
     out = [
         f"q_e,cal = {fmt(qe)} mg/g and k₂ = {fmt(k2)} g mg⁻¹ min⁻¹.",
-        f"The initial adsorption rate is h = k₂·q_e² = {fmt(h)} mg g⁻¹ min⁻¹ — the "
+        f"The initial adsorption rate is h = k₂·q_e² = {fmt(h)} mg g⁻¹ min⁻¹, the "
         f"slope of uptake at t = 0, and the most directly comparable number between "
         f"experiments. The half-time is t₁/₂ = 1/(k₂q_e) = {fmt(t_half)} min.",
         "The pseudo-second-order model assumes the rate depends on the *square* of "
         "the number of free sites, d q_t/dt = k₂(q_e − q_t)². It is conventionally "
-        "read as evidence that chemisorption — valency forces through sharing or "
-        "exchange of electrons — controls the rate.",
+        "read as evidence that chemisorption, meaning valency forces through sharing or "
+        "exchange of electrons: controls the rate.",
     ]
     q_obs = float(np.max(f.y))
     if q_obs > 0:
@@ -183,7 +183,7 @@ def _interp_pso(f, ctx):
     out.append(
         "Two cautions that the literature routinely omits. First, PSO fits almost "
         "every batch dataset well, because its algebraic form happens to match the "
-        "shape of a saturating curve — so a high R² for PSO is weak evidence of "
+        "shape of a saturating curve, so a high R² for PSO is weak evidence of "
         "chemisorption, not strong evidence. Second, k₂ is not a true constant: it "
         "varies systematically with initial concentration, adsorbent dose and "
         "particle size, so k₂ values are only comparable between experiments run "
@@ -195,7 +195,7 @@ def _interp_pso(f, ctx):
             f"Because your data were collected at C₀ = {c0} mg/L, the k₂ reported here "
             f"belongs to that concentration only. To claim a concentration-independent "
             f"mechanism you would need k₂ measured across several C₀ values and shown "
-            f"to be constant — which it usually is not."
+            f"to be constant: which it usually is not."
         )
     return out
 
@@ -211,7 +211,7 @@ PSO = ModelSpec(
         ParamSpec("qe", "q_e,cal", "mg g⁻¹", "Calculated equilibrium capacity.",
                   lower=1e-12, guess_fn=_qe_guess),
         ParamSpec("k2", "k₂", "g mg⁻¹ min⁻¹",
-                  "Pseudo-second-order rate constant. Not a true constant — it "
+                  "Pseudo-second-order rate constant. Not a true constant: it "
                   "varies with C₀, dose and particle size.",
                   lower=1e-14, guess_fn=_k2_guess),
     ],
@@ -228,7 +228,7 @@ PSO = ModelSpec(
                    lambda x, y, c: (x, np.where(y > 0, x / np.where(y > 0, y, np.nan), np.nan)),
                    lambda s, i, c: {"qe": 1.0 / s if s else np.nan,
                                     "k2": (s ** 2 / i) if i else np.nan},
-                   note="By far the most used form — and the reason PSO appears to "
+                   note="By far the most used form: and the reason PSO appears to "
                         "fit everything. Plotting t/qt against t builds a spurious "
                         "correlation because t appears on both axes, so R² is high "
                         "even for data the model does not describe."),
@@ -253,7 +253,7 @@ def _elovich(t, alpha, beta):
 def _interp_elovich(f, ctx):
     a = f.params["alpha"]; b = f.params["beta"]
     out = [
-        f"α = {fmt(a)} mg g⁻¹ min⁻¹ is the initial adsorption rate — the uptake rate "
+        f"α = {fmt(a)} mg g⁻¹ min⁻¹ is the initial adsorption rate, the uptake rate "
         f"when the surface is still bare.",
         f"β = {fmt(b)} g mg⁻¹ is the desorption constant, related to the extent of "
         f"surface coverage and the activation energy for chemisorption. 1/β = "
@@ -327,7 +327,7 @@ def _interp_avrami(f, ctx):
         f"n_AV = {fmt(n)}.",
         "The Avrami equation comes from nucleation-and-growth theory and was "
         "adapted to adsorption to allow a *fractional* reaction order. Its value is "
-        "that n_AV is not forced to 1 or 2 — it is fitted, so the data choose.",
+        "that n_AV is not forced to 1 or 2; it is fitted, so the data choose.",
         f"n_AV = {fmt(n)} is the fractional kinetic order. It reflects possible "
         f"changes in the adsorption mechanism as the process advances, rather than "
         f"a single elementary step.",
@@ -339,7 +339,7 @@ def _interp_avrami(f, ctx):
     elif n < 1:
         out.append(
             f"n_AV = {fmt(n)} below 1 indicates the rate decays faster than "
-            f"first-order at early times — often read as a broad distribution of "
+            f"first-order at early times: often read as a broad distribution of "
             f"site reactivities, or as diffusion beginning to limit the rate."
         )
     else:
@@ -412,9 +412,9 @@ MIXED_12 = ModelSpec(
         f"f₂ = {fmt(f.params['f2'])}.",
         f"f₂ is the headline number: it is the fraction of the uptake behaving as "
         f"second order. f₂ = {fmt(f.params['f2'])} means the process is "
-        + ("essentially pure pseudo-first-order — report PFO instead."
+        + ("essentially pure pseudo-first-order; report PFO instead."
            if f.params['f2'] < 0.1 else
-           "essentially pure pseudo-second-order — report PSO instead."
+           "essentially pure pseudo-second-order; report PSO instead."
            if f.params['f2'] > 0.9 else
            f"genuinely mixed, roughly {f.params['f2'] * 100:.0f}% second-order in "
            f"character. This is the case where MOE earns its extra parameter: "
@@ -467,7 +467,7 @@ NTH_ORDER = ModelSpec(
            "It is close to 2, so pseudo-second-order is justified."
            if abs(f.params['n'] - 2) < 0.25 else
            f"It is far from both 1 and 2, which means neither PFO nor PSO is the "
-           f"right description — forcing one of them onto these data would give a "
+           f"right description: forcing one of them onto these data would give a "
            f"rate constant with no physical meaning."),
         "Note that k_n's units depend on n, so k_n from this fit cannot be compared "
         "with a k₁ or k₂ from PFO/PSO.",
@@ -513,9 +513,9 @@ RITCHIE = ModelSpec(
         f"Unlike the empirical nth-order model, Ritchie's n has a physical "
         f"referent: the number of surface sites occupied by a single adsorbate "
         f"molecule. n = {fmt(f.params['n'])} therefore suggests "
-        + ("monodentate binding — one molecule per site."
+        + ("monodentate binding: one molecule per site."
            if abs(f.params['n'] - 1) < 0.25 else
-           "bidentate binding — each molecule occupies two sites, which is common "
+           "bidentate binding: each molecule occupies two sites, which is common "
            "for chelating metal complexes and carboxylate groups."
            if abs(f.params['n'] - 2) < 0.4 else
            f"roughly {f.params['n']:.1f} sites per molecule, a non-integer value "
@@ -546,7 +546,7 @@ def _interp_wm(f, ctx):
         out.append(
             f"C = {fmt(C)} mg/g is essentially zero, so the line passes through the "
             f"origin. That is the specific condition under which intraparticle "
-            f"diffusion is the **sole** rate-limiting step — external film diffusion "
+            f"diffusion is the **sole** rate-limiting step, external film diffusion "
             f"contributes nothing measurable."
         )
     else:
@@ -560,7 +560,7 @@ def _interp_wm(f, ctx):
     out.append(
         "Important methodological point: a single straight line fitted through all "
         "your q_t vs √t points is almost always the wrong analysis. The standard "
-        "interpretation requires you to identify *multiple linear regions* — "
+        "interpretation requires you to identify *multiple linear regions*"
         "typically an initial fast external surface adsorption stage, a second "
         "gradual stage where intraparticle diffusion is rate-limiting, and a final "
         "plateau as equilibrium is approached. Use the multi-region tool in "
@@ -579,7 +579,7 @@ WEBER_MORRIS = ModelSpec(
     year="1963",
     params=[
         ParamSpec("kid", "k_id", "mg g⁻¹ min⁻⁰·⁵",
-                  "Intraparticle diffusion rate constant — the slope.",
+                  "Intraparticle diffusion rate constant, the slope.",
                   lower=0.0, guess_fn=lambda t, q: float(np.max(q)) / max(np.sqrt(np.max(t)), 1e-9)),
         ParamSpec("C", "C", "mg g⁻¹",
                   "Intercept, proportional to boundary-layer thickness. "
@@ -629,7 +629,7 @@ FILM_DIFFUSION = ModelSpec(
         "liquid film around the adsorbent particle.",
         "Diagnostic: a plot of ln(1 − F) vs t is linear and passes through the "
         "origin if film diffusion controls.",
-        "Mathematically identical to pseudo-first-order — the difference is "
+        "Mathematically identical to pseudo-first-order; the difference is "
         "interpretive, not algebraic.",
     ],
     interpretation=lambda f, c: [
@@ -642,7 +642,7 @@ FILM_DIFFUSION = ModelSpec(
         "What can distinguish them is experiment: film diffusion is sensitive to "
         "stirring speed, PFO site-limited kinetics is not. If your rate constant "
         "changes when you change the agitation rate, film diffusion is real. The "
-        "Boyd plot in the diffusion panel makes the same test graphically — "
+        "Boyd plot in the diffusion panel makes the same test graphically"
         "a straight line through the origin indicates particle diffusion control, "
         "while a non-zero intercept points to film diffusion.",
     ],
@@ -681,7 +681,7 @@ BANGHAM = ModelSpec(
         f"k₀ = {fmt(f.params['k0'])} and α = {fmt(f.params['alpha'])}.",
         f"α = {fmt(f.params['alpha'])} is the diagnostic. "
         + (f"Being below 1, it is consistent with diffusion into the pore network "
-           f"controlling the rate — uptake slows progressively as the adsorbate "
+           f"controlling the rate: uptake slows progressively as the adsorbate "
            f"must travel further into the particle."
            if f.params['alpha'] < 1 else
            f"α ≥ 1 means uptake is not decelerating the way pore diffusion "
@@ -718,7 +718,7 @@ DOUBLE_EXP = ModelSpec(
     ],
     assumptions=[
         "Adsorption proceeds in two parallel or sequential steps with distinct "
-        "rate constants — typically a fast external surface step and a slow "
+        "rate constants: typically a fast external surface step and a slow "
         "internal diffusion step.",
         "Appropriate when the uptake curve shows a clear two-stage shape that a "
         "single exponential cannot follow.",
@@ -731,7 +731,7 @@ DOUBLE_EXP = ModelSpec(
         f"The two rate constants differ by a factor of "
         f"{fmt(f.params['k1'] / f.params['k2']) if f.params['k2'] else 'n.d.'}. "
         + ("That separation is large enough for the two steps to be genuinely "
-           "distinguishable — usually fast adsorption on the external surface "
+           "distinguishable: usually fast adsorption on the external surface "
            "followed by slow diffusion into the interior."
            if f.params['k2'] and f.params['k1'] / f.params['k2'] > 5 else
            "That separation is small, so the two exponentials are not well "
@@ -781,7 +781,7 @@ FRACTAL_PFO = ModelSpec(
         f"h = {fmt(f.params['h'])}.",
         f"The fractal exponent h = {fmt(f.params['h'])} is the point of this model. "
         + ("h ≈ 0 means the rate constant really is constant and classical PFO is "
-           "adequate — the fractal correction is unnecessary here."
+           "adequate; the fractal correction is unnecessary here."
            if f.params['h'] < 0.05 else
            f"h > 0 means the effective rate constant decays with time as t^(−h). "
            f"This is what happens on a geometrically disordered or fractal surface: "
@@ -839,7 +839,7 @@ CRANK = ModelSpec(
         ParamSpec("qe", "q_e", "mg g⁻¹", "Equilibrium capacity.",
                   lower=1e-12, guess_fn=_qe_guess),
         ParamSpec("D", "D", "cm² min⁻¹",
-                  "Effective intraparticle diffusion coefficient — the physical "
+                  "Effective intraparticle diffusion coefficient, the physical "
                   "quantity this model exists to deliver.",
                   lower=1e-20, upper=1e-2, guess=1e-8),
         ParamSpec("r", "r", "cm",
@@ -852,7 +852,7 @@ CRANK = ModelSpec(
         "Diffusion within the particle follows Fick's law with a constant D.",
         "Surface concentration reaches equilibrium instantaneously (no film "
         "resistance).",
-        "D and r are strongly correlated — fix r at its measured value.",
+        "D and r are strongly correlated, fix r at its measured value.",
     ],
     interpretation=lambda f, c: [
         f"q_e = {fmt(f.params['qe'])} mg/g, D = {fmt(f.params['D'])} cm²/min, "
@@ -865,7 +865,7 @@ CRANK = ModelSpec(
            "resistance."),
         "Because D appears only as D/r², it is perfectly correlated with the "
         "particle radius. If you fitted r rather than fixing it at a measured "
-        "value, neither number is meaningful on its own — only the ratio is.",
+        "value, neither number is meaningful on its own, only the ratio is.",
     ],
 )
 
@@ -961,8 +961,8 @@ def _elovich_domain(x, y, ctx):
                 out.append(issue(
                     "warn", "elovich_plateau",
                     "Your data have clearly reached a plateau. The Elovich equation "
-                    "has no equilibrium plateau — it rises logarithmically without "
-                    "limit — so it cannot reproduce the flat region and will "
+                    "has no equilibrium plateau: it rises logarithmically without "
+                    "limit: so it cannot reproduce the flat region and will "
                     "systematically overshoot at long times. It suits data still in "
                     "the rising, chemisorption-controlled stage."))
     return out
@@ -981,7 +981,7 @@ def _weber_morris_validity(p, x, y, ctx):
             f"meant to be proportional to boundary-layer thickness and cannot be "
             f"negative physically. This is the usual sign that a single straight "
             f"line has been forced through what are really two or three distinct "
-            f"diffusion stages — use the multi-region analysis on the Diffusion "
+            f"diffusion stages; use the multi-region analysis on the Diffusion "
             f"tab instead of this single-line fit."))
     return out
 
@@ -1002,7 +1002,7 @@ def _double_exp_validity(p, x, y, ctx):
             "warn", "de_amplitude",
             f"The fast-step amplitude a₁ = {fmt(a1)} mg/g exceeds the total "
             f"capacity q_e = {fmt(qe)} mg/g, which makes the slow step's amplitude "
-            f"negative — i.e. the model is describing desorption in the second "
+            f"negative: i.e. the model is describing desorption in the second "
             f"stage. That is rarely intended; the two exponentials are probably "
             f"not separable in these data.")]
     k1, k2 = p.get("k1", 0.0), p.get("k2", 0.0)
@@ -1011,7 +1011,7 @@ def _double_exp_validity(p, x, y, ctx):
             "warn", "de_unseparated",
             f"The two rate constants differ by only a factor of {fmt(k1 / k2)}. "
             f"Two exponentials that close together are not distinguishable from a "
-            f"single one — the extra two parameters are fitting noise. Prefer the "
+            f"single one: the extra two parameters are fitting noise. Prefer the "
             f"pseudo-first-order model unless the standard errors say otherwise.")]
     return []
 

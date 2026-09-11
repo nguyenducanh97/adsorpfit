@@ -1,11 +1,11 @@
 /* ==========================================================================
-   AdsorpFit — internationalisation.
+   AdsorpFit: internationalisation.
 
    Scope note, stated honestly: the interface, the guide, the model names,
    the parameter meanings and the advisor verdicts are translated. The
    automatically generated interpretation paragraphs are composed in Python
    with fitted numbers interpolated into them, and those remain English for
-   now — translating them means maintaining a parallel set of sentence
+   now: translating them means maintaining a parallel set of sentence
    templates in the Python layer, which is a separate piece of work.
 
    Usage:
@@ -87,7 +87,7 @@ const I18N = (function () {
       "data.pasteIsotherm": "Paste two columns: Ce and qe",
 
       "opt.ols": "Ordinary least squares (equal weight)",
-      "opt.rel": "Relative error (1/y) — favours small values",
+      "opt.rel": "Relative error (1/y): favours small values",
       "opt.sqrt": "Poisson-like (1/√y)",
 
       "fig.labels": "Labels & title",
@@ -127,6 +127,11 @@ const I18N = (function () {
       "set.densityComfy": "Comfortable",
       "set.densityCompact": "Compact",
 
+      "set.panels": "Panels",
+      "set.panelsHelp": "Drag the bar between the two columns to resize them. Drag a panel by the dotted grip in its header to reorder it, click the chevron to collapse it, and drag the grip under a figure to change its height.",
+      "set.resetLayout": "Reset panel layout",
+      "set.layoutReset": "Panel layout reset.",
+
       "proj.title": "Projects",
       "proj.save": "Save project",
       "proj.saveAs": "Save as…",
@@ -161,8 +166,11 @@ const I18N = (function () {
       "help.radius": "For Boyd and Crank diffusion coefficients.",
       "help.mw": "Needed for Dubinin–Radushkevich E and for the thermodynamic K° conversion.",
       "help.thermoIntro": "Enter one isotherm dataset per temperature. AdsorpFit fits your chosen isotherm model at each temperature, converts its constant into a properly dimensionless K°, and runs the van't Hoff analysis.",
-      "help.boot": "This loads NumPy, SciPy and Matplotlib into your browser. It happens once per visit and takes roughly 10–20 seconds. Nothing you enter ever leaves your computer — all fitting runs locally.",
-      "help.footPrivacy": "All fitting runs locally in your browser — no data is uploaded.",
+      "help.boot": "This loads NumPy, SciPy and Matplotlib into your browser. It happens once per visit and takes roughly 10–20 seconds. Nothing you enter ever leaves your computer, all fitting runs locally.",
+      "help.footPrivacy": "All fitting runs locally in your browser, no data is uploaded.",
+      "foot.dept": "(Sustainable Water Treatment), School of Civil, Architectural Engineering and Landscape Architecture, Sungkyunkwan University",
+      "foot.opensource": "Open source under the MIT licence.",
+      "foot.contact": "Questions and bug reports",
       "th.step1": "1 · Isotherms at several temperatures",
       "th.step2": "2 · Equilibrium constant",
       "th.step3": "3 · Optional analyses",
@@ -247,7 +255,7 @@ const I18N = (function () {
       "data.pasteIsotherm": "두 개의 열을 붙여넣으세요: Ce와 qe",
 
       "opt.ols": "일반 최소제곱 (동일 가중치)",
-      "opt.rel": "상대 오차 (1/y) — 작은 값 중시",
+      "opt.rel": "상대 오차 (1/y): 작은 값 중시",
       "opt.sqrt": "푸아송형 (1/√y)",
 
       "fig.labels": "축 제목 및 제목",
@@ -287,6 +295,11 @@ const I18N = (function () {
       "set.densityComfy": "넓게",
       "set.densityCompact": "좁게",
 
+      "set.panels": "패널",
+      "set.panelsHelp": "두 열 사이의 막대를 끌어 너비를 조절할 수 있습니다. 패널 머리글의 점 모양 손잡이를 끌면 순서를 바꿀 수 있고, 화살표를 누르면 접히며, 그래프 아래 손잡이를 끌면 높이를 조절할 수 있습니다.",
+      "set.resetLayout": "패널 배치 초기화",
+      "set.layoutReset": "패널 배치를 초기화했습니다.",
+
       "proj.title": "프로젝트",
       "proj.save": "프로젝트 저장",
       "proj.saveAs": "다른 이름으로 저장…",
@@ -323,6 +336,9 @@ const I18N = (function () {
       "help.thermoIntro": "온도별로 등온흡착 데이터를 하나씩 입력하세요. 각 온도에서 선택한 등온흡착식을 피팅하고, 그 상수를 무차원 K°로 변환한 뒤 van't Hoff 해석을 수행합니다.",
       "help.boot": "NumPy, SciPy, Matplotlib을 브라우저에 불러옵니다. 방문할 때 한 번만 수행되며 약 10~20초가 걸립니다. 입력한 데이터는 컴퓨터를 벗어나지 않으며 모든 계산은 로컬에서 실행됩니다.",
       "help.footPrivacy": "모든 계산은 사용자의 브라우저에서 실행되며, 데이터는 업로드되지 않습니다.",
+      "foot.dept": "(지속가능 수처리 연구실), 성균관대학교 건설환경공학부",
+      "foot.opensource": "MIT 라이선스로 공개된 오픈소스입니다.",
+      "foot.contact": "문의 및 오류 제보",
       "th.step1": "1 · 여러 온도의 등온흡착 데이터",
       "th.step2": "2 · 평형상수",
       "th.step3": "3 · 선택 해석",

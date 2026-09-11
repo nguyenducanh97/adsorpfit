@@ -211,7 +211,7 @@ def advise(category: str, x, y, ctx: dict | None = None,
                         f"Fits as well as anything here (R² = {fmt(r2)}), but "
                         f"{simpler[0]} matches it with only {simpler[1]} parameters "
                         f"instead of {spec.n_params}. The extra parameters are not "
-                        f"earning their place — prefer the simpler model unless you "
+                        f"earning their place; prefer the simpler model unless you "
                         f"need this one's specific physical meaning.")
                 else:
                     verdict = "recommend"
@@ -224,7 +224,7 @@ def advise(category: str, x, y, ctx: dict | None = None,
                 verdict = "usable"
                 reasons.append(
                     f"Describes the data well (R² = {fmt(r2)}) but is "
-                    f"ΔAICc = {fmt(delta)} behind the leading model — it costs "
+                    f"ΔAICc = {fmt(delta)} behind the leading model; it costs "
                     f"accuracy or parameters without a compensating gain.")
             else:
                 verdict = "usable"
@@ -292,14 +292,14 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                              "elovich_isotherm", "baudu", "vieth_sladek")
         if saturating and s["still_rising"]:
             r.append("This model's capacity parameter is a saturation plateau, "
-                     "and your data have not reached one — so q_max will be an "
+                     "and your data have not reached one, so q_max will be an "
                      "extrapolation well beyond the measured range.")
         if saturating and s["plateaus"]:
             r.append("Your data reach a clear plateau, which is exactly what this "
                      "model's saturation capacity is meant to describe.")
         if key == "freundlich":
             if s["plateaus"]:
-                r.append("Freundlich has no plateau — it rises without limit — so "
+                r.append("Freundlich has no plateau: it rises without limit: so "
                          "it cannot reproduce the flat region your data show, and "
                          "K_F must not be quoted as a capacity.")
             else:
@@ -311,7 +311,7 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                      "middle of a concentration series.")
         if key == "hill" and s.get("sigmoidal"):
             r.append("Your isotherm looks sigmoidal, and Hill is one of the few "
-                     "models here that can produce an S-shape — that is a genuine "
+                     "models here that can produce an S-shape; that is a genuine "
                      "reason to prefer it over Langmuir.")
         if key in ("langmuir", "sips", "toth") and s.get("sigmoidal"):
             r.append("Your isotherm appears sigmoidal. This model is strictly "
@@ -330,7 +330,7 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                 and abs(s["slope_drift"]) > 0.15:
             r.append("The log–log slope changes noticeably from the dilute to the "
                      "concentrated end of your data, which is the signature of a "
-                     "heterogeneous surface — the situation this model's extra "
+                     "heterogeneous surface: the situation this model's extra "
                      "exponent exists to capture.")
     else:
         needs_eq = key in ("pfo", "pso", "avrami", "mixed_1_2", "nth_order",
@@ -338,13 +338,13 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                            "double_exponential", "crank")
         if needs_eq and s["still_rising"]:
             r.append("This model fits an equilibrium capacity, and your run has "
-                     "not equilibrated — q_e and the rate constant will trade off "
+                     "not equilibrated: q_e and the rate constant will trade off "
                      "against each other.")
         if needs_eq and s["equilibrated"]:
             r.append("Your run reaches a clear plateau, so q_e is well defined.")
         if not s["well_sampled_early"]:
             r.append(f"Only {s['n_early']} point(s) before half the uptake was "
-                     f"reached — rate constants are determined by that region.")
+                     f"reached: rate constants are determined by that region.")
         if key == "elovich" and s["equilibrated"]:
             r.append("Elovich rises logarithmically without limit, so it cannot "
                      "match the plateau in your data.")
@@ -357,7 +357,7 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                 r.append("Your curve shows no clear two-stage break, so the second "
                          "exponential has little to explain.")
         if key in ("weber_morris",) and s.get("two_stage"):
-            r.append("A break in the q vs √t slope is visible in your data — the "
+            r.append("A break in the q vs √t slope is visible in your data, the "
                      "multi-region analysis on the Diffusion tab is the right tool "
                      "for it.")
         if not s["monotonic"]:
@@ -377,7 +377,7 @@ def _shape_summary(category, s, ctx) -> list[str]:
             + (f"({s['decades']:.1f} decades)" if np.isfinite(s["decades"]) else "")
             + f", with q_e from {fmt(s['y_min'])} to {fmt(s['y_max'])}.")
         if s["plateaus"]:
-            out.append("The isotherm **reaches a plateau** — the top third of the "
+            out.append("The isotherm **reaches a plateau**, the top third of the "
                        "concentration range adds little further uptake. Saturation "
                        "models (Langmuir, Sips, Tóth) can therefore give a capacity "
                        "that is measured rather than extrapolated.")
@@ -398,15 +398,15 @@ def _shape_summary(category, s, ctx) -> list[str]:
                 + ("Well below 1, so adsorption is strongly favourable and the "
                    "surface is energetically heterogeneous."
                    if sl < 0.5 else
-                   "Close to 1, so uptake is nearly proportional to concentration "
-                   "— you may be in the linear Henry's-law regime, where most "
+                   "Close to 1, so uptake is nearly proportional to concentration; "
+                   "you may be in the linear Henry's-law regime, where most "
                    "isotherm models become hard to distinguish."
                    if sl > 0.85 else
                    "Between 0.5 and 1, the usual favourable range."))
         if s["is_linear"]:
             out.append("**Caution:** your data are nearly a straight line through "
                        "the origin. In this regime almost every isotherm model will "
-                       "fit well and they cannot be told apart — extend the "
+                       "fit well and they cannot be told apart; extend the "
                        "concentration range before claiming a mechanism.")
         if s.get("sigmoidal"):
             out.append("The curve appears **sigmoidal** (uptake accelerates before "
@@ -417,8 +417,8 @@ def _shape_summary(category, s, ctx) -> list[str]:
             f"You have {s['n']} time points from {fmt(s['t_min'])} to "
             f"{fmt(s['t_max'])}, reaching q = {fmt(s['q_max'])}.")
         if s["equilibrated"]:
-            out.append("The run **reaches equilibrium** — uptake is flat over the "
-                       "final third — so q_e is directly measured and the models "
+            out.append("The run **reaches equilibrium**; uptake is flat over the "
+                       "final third: so q_e is directly measured and the models "
                        "that fit it are on solid ground.")
         elif s["still_rising"]:
             out.append("Uptake is **still climbing** at your last time point. Every "
@@ -429,13 +429,13 @@ def _shape_summary(category, s, ctx) -> list[str]:
             f"{s['n_early']} point(s) fall below half the final uptake. "
             + ("That is enough to define the early, fast stage that fixes the rate "
                "constant." if s["well_sampled_early"] else
-               "**That is too few** — rate constants are determined almost entirely "
+               "**That is too few**: rate constants are determined almost entirely "
                "by the early stage, so sample more densely at short times."))
         if s.get("two_stage"):
             out.append(
                 f"The uptake rate against √t drops by a factor of "
                 f"{fmt(s.get('slope_ratio'))} partway through, which indicates "
-                f"**two distinct stages** — typically fast external-surface "
+                f"**two distinct stages**: typically fast external-surface "
                 f"adsorption followed by slower intraparticle diffusion. The "
                 f"Weber–Morris multi-region analysis and the double-exponential "
                 f"model are both worth running.")

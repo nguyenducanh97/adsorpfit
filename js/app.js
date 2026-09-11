@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AdsorpFit — application controller.
+   AdsorpFit: application controller.
 
    Responsibilities, in order:
      1. boot Pyodide and load the Python engine from /py
@@ -103,7 +103,7 @@
   // Render a LaTeX string with KaTeX. Every model carries a proper `equation`
   // field in LaTeX; `equation_plain` is only the ASCII fallback used when
   // KaTeX has not loaded (offline, blocked CDN) or the expression fails to
-  // parse — never as the primary display.
+  // parse: never as the primary display.
   function tex(latex, opts) {
     opts = opts || {};
     if (typeof katex === "undefined" || !latex) return null;
@@ -176,7 +176,7 @@
         await micropip.install("openpyxl");
         XLSX_AVAILABLE = true;
       } catch (e) {
-        console.warn("openpyxl unavailable — .xlsx export disabled", e);
+        console.warn("openpyxl unavailable:.xlsx export disabled", e);
         XLSX_AVAILABLE = false;
       }
 
@@ -220,7 +220,7 @@
         md(String(e.message || e)) +
         '<br><span class="tiny">If you opened this file directly from disk, ' +
         'the browser blocks loading the Python modules. Serve the folder over ' +
-        'HTTP instead — for example <code>python -m http.server</code> — or use ' +
+        'HTTP instead: for example <code>python -m http.server</code>, or use ' +
         'the published GitHub Pages URL.</span>';
     }
   }
@@ -333,7 +333,7 @@
     };
     if (data.x.some(function (v) { return v === null; }) ||
         data.y.some(function (v) { return v === null; })) {
-      toast("Some cells are empty — those rows were dropped.", "warn");
+      toast("Some cells are empty; those rows were dropped.", "warn");
       const keep = [];
       for (let i = 0; i < n; i++) if (data.x[i] !== null && data.y[i] !== null) keep.push(i);
       ["x", "y", "yerr", "C0col"].forEach(function (k) {
@@ -393,6 +393,7 @@
         criterion: $("#" + pref + "-criterion").value
       });
       STATE[cat].fit = res;
+      STATE[cat].frames = null;      // recompute the pinned plot frame
 
       if (cat === "kinetics") {
         try {
@@ -403,7 +404,8 @@
         } catch (e) { STATE.kinetics.diffusion = null; }
       }
       renderResults(cat);
-      toast("Fitted " + models.length + " models.", "good");
+      toast(I18N.t("msg.fitted", { n: models.length }), "good");
+      scrollToResults(cat);
     } catch (e) {
       toast("Fitting failed: " + e.message, "bad", 8000);
     } finally {
@@ -600,6 +602,9 @@
     panes.appendChild(el("div", { "data-pane": "export", class: "hidden" }, [renderExport(cat)]));
 
     drawMainFigure(cat);
+    // the results panel and its plot were just created, so give them their
+    // collapse, drag and resize affordances
+    Layout.refresh();
   }
 
   function showSub(cat, name) {
@@ -659,7 +664,7 @@
           el("td", { class: "num", text: r.n_params }),
           el("td", { class: "num", text: fmt(r.value, 5) }),
           el("td", { class: "num", text: fmt(r.delta, 3) }),
-          el("td", { class: "num", text: r.weight === null ? "—" :
+          el("td", { class: "num", text: r.weight === null ? "":
                      (r.weight * 100).toFixed(1) + "%" }),
           el("td", { class: "num", text: fmt(r.R2, 5) }),
           el("td", { class: "num", text: fmt(r.adj_R2, 5) }),
@@ -672,7 +677,7 @@
 
     wrap.appendChild(el("p", { class: "tiny", style: "margin-top:10px" , html:
       "<strong>Δ</strong> is the difference in " + crit + " from the best model. " +
-      "<strong>weight</strong> is the Akaike weight — the probability that this model " +
+      "<strong>weight</strong> is the Akaike weight, the probability that this model " +
       "is the best approximating one <em>among those you fitted</em>. Models within " +
       "Δ &lt; 2 of the leader are not statistically distinguishable from it." }));
 
@@ -760,6 +765,7 @@
       // start visible), so the figure has to be redrawn once they exist.
       buildTraceControls(cat, traceHost);
       drawMainFigure(cat);
+      Layout.refresh();
     }, 10);
     return shell;
   }
@@ -900,6 +906,96 @@
     return out;
   }
 
+  // The plot frame is computed once per fit from ALL series, then pinned.
+  //
+  // Without this, Plotly autoranges over only the visible traces, so hiding a
+  // model whose curve runs outside the data envelope (Freundlich, Temkin and
+  // Halsey have no plateau; Harkins-Jura and BET diverge) rescales both axes
+  // and every remaining curve visibly jumps. Models that sit inside the data
+  // envelope did not trigger it, which is why it looked intermittent.
+  //
+  // Curves are allowed to stretch the frame only so far past the measured
+  // data. Beyond that they are clipped, so one diverging model cannot flatten
+  // every other curve into a horizontal line.
+  function computeFrame(cat, mode) {
+    const st = STATE[cat];
+    const d = st.data;
+    if (!d) return null;
+    const series = seriesFor(cat);
+
+    function pad(lo, hi, frac) {
+      if (!isFinite(lo) || !isFinite(hi)) return null;
+      if (hi === lo) { const e = Math.abs(hi || 1) * 0.1; return [lo - e, hi + e]; }
+      const m = (hi - lo) * (frac === undefined ? 0.06 : frac);
+      return [lo - m, hi + m];
+    }
+
+    if (mode === "residual") {
+      let m = 0;
+      series.forEach(function (s) {
+        (s.residuals || []).forEach(function (r) {
+          if (isFinite(r)) m = Math.max(m, Math.abs(r));
+        });
+      });
+      m = m || 1;
+      return { x: pad(Math.min.apply(null, d.x), Math.max.apply(null, d.x)),
+               y: [-m * 1.15, m * 1.15] };
+    }
+
+    if (mode === "predobs") {
+      const all = d.y.slice();
+      series.forEach(function (s) {
+        (s.y_cal || []).forEach(function (v) { if (isFinite(v)) all.push(v); });
+      });
+      const lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+      return { x: pad(lo, hi), y: pad(lo, hi) };
+    }
+
+    const xLo = Math.min(0, Math.min.apply(null, d.x));
+    const xHi = Math.max.apply(null, d.x);
+    const yLo = Math.min.apply(null, d.y);
+    const yHi = Math.max.apply(null, d.y);
+    const span = (yHi - yLo) || Math.abs(yHi) || 1;
+    // How far outside the measured data a curve may push the frame. Kept
+    // tight so the data fill the plot: a model that diverges runs off the
+    // top, which is both honest and more readable than squashing every
+    // other curve to accommodate it.
+    const ceiling = yHi + 0.15 * span;
+    const floor = yLo - 0.10 * span;
+
+    let lo = yLo, hi = yHi;
+    series.forEach(function (s) {
+      if (!s.curve) return;
+      s.curve.y.forEach(function (v) {
+        if (!isFinite(v)) return;
+        if (v < hi && v > ceiling) return;
+        if (v > lo && v < floor) return;
+        if (v <= ceiling && v > hi) hi = v;
+        if (v >= floor && v < lo) lo = v;
+      });
+    });
+    return { x: pad(xLo, xHi * 1.03, 0.02), y: pad(lo, hi, 0.06) };
+  }
+
+  // After a fit, bring the results into view. On the wide two-column layout
+  // the results sit beside the controls, so the page only needs to return to
+  // the top; when the columns are stacked they sit below, so scroll to them.
+  function scrollToResults(cat) {
+    const host = $(cat === "kinetics" ? "#kin-results" : "#iso-results");
+    if (!host) return;
+    setTimeout(function () {
+      const stacked = document.documentElement.getAttribute("data-layout") === "stack"
+        || window.matchMedia("(max-width: 1150px)").matches;
+      const behavior = Prefs.get("motion") === "off" ? "auto" : "smooth";
+      if (stacked) {
+        const y = host.getBoundingClientRect().top + window.scrollY - 70;
+        window.scrollTo({ top: Math.max(0, y), behavior: behavior });
+      } else {
+        window.scrollTo({ top: 0, behavior: behavior });
+      }
+    }, 60);
+  }
+
   function drawMainFigure(cat) {
     const div = $("#" + cat + "-plot");
     if (!div) return;
@@ -916,6 +1012,20 @@
     } else if (mode === "predobs") {
       style.x_label = "Observed $q$"; style.y_label = "Predicted $q$";
     }
+
+    st.frames = st.frames || {};
+    if (!st.frames[mode]) st.frames[mode] = computeFrame(cat, mode);
+    const frame = st.frames[mode];
+    // An explicit range the user typed always wins over the pinned frame.
+    if (frame) {
+      if (style.x_min === null || style.x_min === undefined || style.x_min === "") {
+        style.x_min = frame.x[0]; style.x_max = frame.x[1];
+      }
+      if (style.y_min === null || style.y_min === undefined || style.y_min === "") {
+        style.y_min = frame.y[0]; style.y_max = frame.y[1];
+      }
+    }
+
     st.effectiveStyle = style;
     Fig.draw(div.id, traces, style, theme());
   }
@@ -1069,7 +1179,7 @@
         blockers.length ? el("p", { class: "tiny", style: "margin:0 0 12px",
           text: "The interpretation below is generated from parameters that fall "
               + "outside this model's valid range. It is shown for completeness "
-              + "only — do not quote it." }) : null,
+              + "only; do not quote it." }): null,
         el("ul", { class: "interp" }, m.interpretation.map(function (s) {
           return el("li", { html: md(s) });
         })),
@@ -1187,7 +1297,7 @@
         "Linearised fits are shown for comparison with the older literature, not " +
         "because they are better. Transforming the data changes which points " +
         "dominate the regression, so the parameters below generally differ from " +
-        "the non-linear ones — and the R² of a linear plot is not comparable with " +
+        "the non-linear ones: and the R² of a linear plot is not comparable with " +
         "the R² of a non-linear fit. Where the two disagree, report the non-linear " +
         "result.") })
     ]));
@@ -1228,7 +1338,7 @@
       const body = el("div", { class: "rb" });
       m.linear.forEach(function (lf, j) {
         body.appendChild(el("div", { class: "section-title",
-          text: lf.form_name + " — " + lf.y_label + " vs " + lf.x_label }));
+          text: lf.form_name + "" + lf.y_label + " vs " + lf.x_label }));
         if (lf.note) {
           body.appendChild(el("p", { class: "tiny", html: md(lf.note) }));
         }
@@ -1249,7 +1359,7 @@
                   el("td", { text: p.symbol }),
                   el("td", { class: "num", text: fmt(a, 5) }),
                   el("td", { class: "num", text: fmt(b, 5) }),
-                  el("td", { class: "num", text: diff === null ? "—" :
+                  el("td", { class: "num", text: diff === null ? "":
                              (diff > 0 ? "+" : "") + diff.toFixed(1) + "%" })
                 ]);
               }))
@@ -1281,25 +1391,25 @@
   /* ------------------------------------------------------------- export */
 
   const IMAGE_FORMATS = [
-    ["png", "PNG — raster, lossless, universal"],
-    ["tiff", "TIFF — LZW compressed, the Elsevier/Wiley standard for line art"],
-    ["pdf", "PDF — vector, editable, best for LaTeX"],
-    ["svg", "SVG — vector, editable in Illustrator or Inkscape"],
-    ["eps", "EPS — vector PostScript, required by some older journals"],
-    ["ps", "PS — PostScript"],
-    ["jpg", "JPEG — lossy; only for photographs, not line art"],
-    ["webp", "WebP — modern raster, good for web supplements"],
-    ["bmp", "BMP — uncompressed raster"]
+    ["png", "PNG: raster, lossless, universal"],
+    ["tiff", "TIFF: LZW compressed, the Elsevier/Wiley standard for line art"],
+    ["pdf", "PDF: vector, editable, best for LaTeX"],
+    ["svg", "SVG: vector, editable in Illustrator or Inkscape"],
+    ["eps", "EPS: vector PostScript, required by some older journals"],
+    ["ps", "PS: PostScript"],
+    ["jpg", "JPEG: lossy; only for photographs, not line art"],
+    ["webp", "WebP: modern raster, good for web supplements"],
+    ["bmp", "BMP: uncompressed raster"]
   ];
 
   const TABLE_FORMATS = [
-    ["csv", "CSV — comma separated"],
-    ["tsv", "TSV — tab separated, pastes straight into Excel"],
-    ["xlsx", "XLSX — formatted Excel workbook, one sheet per table"],
-    ["markdown", "Markdown — for GitHub or notebooks"],
-    ["latex", "LaTeX — a complete table environment"],
-    ["html", "HTML — for Word via paste"],
-    ["json", "JSON — the full result object"]
+    ["csv", "CSV: comma separated"],
+    ["tsv", "TSV: tab separated, pastes straight into Excel"],
+    ["xlsx", "XLSX: formatted Excel workbook, one sheet per table"],
+    ["markdown", "Markdown: for GitHub or notebooks"],
+    ["latex", "LaTeX: a complete table environment"],
+    ["html", "HTML: for Word via paste"],
+    ["json", "JSON: the full result object"]
   ];
 
   function renderExport(cat) {
@@ -1324,7 +1434,7 @@
     ]));
     wrap.appendChild(el("p", { class: "tiny", html:
       "The export is rendered by Matplotlib using exactly the style settings on " +
-      "the Figures tab — it is not a screenshot of the preview. Vector formats " +
+      "the Figures tab: it is not a screenshot of the preview. Vector formats " +
       "(PDF, SVG, EPS, PS) ignore the resolution setting because they have no " +
       "pixels; set it for the raster formats." }));
     wrap.appendChild(el("div", { class: "btn-row", style: "margin:10px 0 22px" }, [
@@ -1514,7 +1624,7 @@
     };
     const parts = [
       "<!DOCTYPE html><html><head><meta charset='utf-8'>",
-      "<title>AdsorpFit report — " + cat + "</title><style>",
+      "<title>AdsorpFit report" + cat + "</title><style>",
       "body{font:14px/1.65 system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 20px;color:#12303c}",
       "h1{font-size:24px}h2{font-size:18px;margin-top:32px;border-bottom:2px solid #cfe0e8;padding-bottom:6px}",
       "h3{font-size:15px;margin-top:22px}table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0}",
@@ -1522,7 +1632,7 @@
       "li{margin-bottom:8px}code{background:#eef6f9;padding:1px 5px;border-radius:3px}",
       ".eq{background:#f4fafc;border:1px solid #cfe0e8;padding:10px;text-align:center;font-family:Georgia,serif}",
       "</style></head><body>",
-      "<h1>AdsorpFit report — " + cat + "</h1>",
+      "<h1>AdsorpFit report" + cat + "</h1>",
       "<p>Generated " + new Date().toLocaleString() + ". " +
       res.results.length + " models fitted to " + STATE[cat].data.x.length +
       " data points by non-linear least squares.</p>",
@@ -1710,7 +1820,7 @@
         return;
       }
       if (route === "langmuir_molar" && !MW) {
-        toast("Enter the adsorbate molar mass — the Langmuir K° route converts " +
+        toast("Enter the adsorbate molar mass, the Langmuir K° route converts " +
               "K_L from L/mg to L/mol and cannot do that without it.", "bad", 8000);
         return;
       }
@@ -1729,7 +1839,7 @@
       const values = kfit.rows.map(function (r, i) {
         const out = {};
         if (route === "kd_density" || route === "kc_dimensionless") {
-          // Evaluate in the dilute limit — K_D = qe/Ce is only a constant as
+          // Evaluate in the dilute limit, K_D = qe/Ce is only a constant as
           // Ce -> 0 unless the isotherm happens to be linear.
           const ds = datasets[i];
           let jmin = 0;
@@ -1856,7 +1966,7 @@
 
   const x0 = Math.min.apply(null, vh.invT), x1 = Math.max.apply(null, vh.invT);
   figs.vanthoff = {
-    label: "van't Hoff — ln K° vs 1/T",
+    label: "van't Hoff: ln K° vs 1/T",
     traces: [
       { kind: "scatter", x: vh.invT, y: vh.lnK, name: "experimental",
         color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
@@ -1873,7 +1983,7 @@
   };
 
   figs.gibbs = {
-    label: "Gibbs energy — ΔG° vs T",
+    label: "Gibbs energy: ΔG° vs T",
     traces: [
       { kind: "scatter", x: vh.T, y: vh.dG_direct_kJ_mol,
         name: "ΔG° from K°", color: Fig.PALETTE[0],
@@ -1895,7 +2005,7 @@
     });
     if (rows.length) {
       figs.isosteric = {
-        label: "Isosteric heat — ΔH_iso vs loading",
+        label: "Isosteric heat: ΔH_iso vs loading",
         traces: [{
           kind: "scatter", x: rows.map(function (r) { return r.q; }),
           y: rows.map(function (r) { return r.dH_iso_kJ_mol; }),
@@ -1918,7 +2028,7 @@
     const slope = -a.Ea_kJ_mol * 1000 / 8.314462618;
     const icept = Math.log(a.A);
     figs.arrhenius = {
-      label: "Arrhenius — ln k vs 1/T",
+      label: "Arrhenius: ln k vs 1/T",
       traces: [
         { kind: "scatter", x: a.invT, y: a.lnk, name: "experimental",
           color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
@@ -2100,6 +2210,7 @@
 
     panel.appendChild(body);
     host.appendChild(panel);
+    Layout.refresh();
 
     setTimeout(function () {
 
@@ -2308,12 +2419,20 @@
         + "The automatically written interpretation paragraphs are still "
         + "generated in English." }));
 
+      body.appendChild(el("div", { class: "section-title",
+                                   text: I18N.t("set.panels") }));
+      body.appendChild(el("p", { class: "tiny", text: I18N.t("set.panelsHelp") }));
+      body.appendChild(el("div", { class: "btn-row", style: "margin-bottom:6px" }, [
+        el("button", { class: "btn sm", text: I18N.t("set.resetLayout"),
+          onclick: function () { Layout.reset(); toast(I18N.t("set.layoutReset"), "good"); } })
+      ]));
+
       const u = Projects.usage();
       body.appendChild(el("div", { class: "section-title", text: "Storage" }));
       body.appendChild(el("p", { class: "tiny", html:
         u.count + " project(s) saved, using " + (u.bytes / 1024).toFixed(1)
         + " KB of this browser's local storage. Preferences and projects live "
-        + "on this device only — nothing is sent to a server, so they will not "
+        + "on this device only: nothing is sent to a server, so they will not "
         + "follow you to another computer unless you export them to a file." }));
     });
   }
@@ -2424,7 +2543,7 @@
             if (!nm) { toast(I18N.t("proj.name"), "bad"); return; }
             const rec = Projects.save(nm, snapshot(), STATE.projectId);
             if (!rec) {
-              toast("Could not save — this browser's local storage is full. "
+              toast("Could not save: this browser's local storage is full. "
                     + "Delete an old project or export it to a file first.",
                     "bad", 9000);
               return;
@@ -2693,7 +2812,7 @@
   }
 
   const GUIDE_HTML = [
-    "<p>AdsorpFit fits adsorption data in your browser. Nothing is uploaded — ",
+    "<p>AdsorpFit fits adsorption data in your browser. Nothing is uploaded",
     "the Python scientific stack runs locally through WebAssembly, so your ",
     "unpublished data stays on your machine.</p>",
     "<h3>Getting a result</h3><ol>",
@@ -2724,8 +2843,8 @@
     "a conversion route explicitly and states it in the output, because it must ",
     "be stated in your paper too.</p>",
     "<h3>Checks AdsorpFit runs for you</h3><ul>",
-    "<li>Whether a fitted parameter's standard error exceeds the parameter itself ",
-    "— i.e. whether the data actually determine it.</li>",
+    "<li>Whether a fitted parameter's standard error exceeds the parameter ",
+    "itself, i.e. whether the data actually determine it.</li>",
     "<li>Whether q<sub>e,cal</sub> agrees with q<sub>e,exp</sub>, which catches ",
     "bad kinetic fits that R² misses.</li>",
     "<li>Whether the fitted q<sub>max</sub> lies far outside the measured range, ",
@@ -2736,8 +2855,8 @@
     "<li>Whether a linearised fit is flattering itself relative to the same ",
     "parameters tested against the raw data.</li></ul>",
     "<h3>Citing the models</h3>",
-    "<p>Every model card carries the original citation. Cite the primary source ",
-    "— Lagergren 1898, Ho &amp; McKay 1999, Langmuir 1918 — not a recent paper ",
+    "<p>Every model card carries the original citation. Cite the primary ",
+    "source (Lagergren 1898, Ho &amp; McKay 1999, Langmuir 1918), not a recent paper ",
     "that happens to use the model. The <em>?</em> button beside each model shows ",
     "its equation, parameter meanings, assumptions and reference.</p>"
   ].join("");
@@ -2749,6 +2868,7 @@
     Prefs.init();
     I18N.apply(document);
     wire();
+    Layout.init();
     boot();
   }
 

@@ -1,15 +1,15 @@
 /* ==========================================================================
-   AdsorpFit — background water motion.
+   AdsorpFit: background water motion.
 
    Two effects, both deliberately cheap so they never compete with the
    fitting work for CPU:
 
-     1. Caustics — the rippling light pattern you see on the bottom of a
+     1. Caustics: the rippling light pattern you see on the bottom of a
         pool. Rendered into a small offscreen canvas (about 160 x 90 px) and
         scaled up by the browser, which is what makes it affordable. Updated
         at ~20 fps rather than 60.
 
-     2. Bubbles — a handful of DOM elements animated purely by CSS, so they
+     2. Bubbles: a handful of DOM elements animated purely by CSS, so they
         cost nothing on the main thread.
 
    Both stop entirely when the tab is hidden, and respect
@@ -25,11 +25,14 @@
   function makeBubbles() {
     const host = document.getElementById("bubbles");
     if (!host) return;
-    const n = reduced ? 6 : 16;
+    const n = reduced ? 4 : 11;
     for (let i = 0; i < n; i++) {
       const b = document.createElement("span");
       b.className = "bubble";
-      const size = 5 + Math.random() * 20;
+      // Deliberately small. Large bubbles drift across the reading area and
+      // pull the eye away from the numbers, which is the opposite of what a
+      // background should do.
+      const size = 2 + Math.random() * 5;
       b.style.width = size + "px";
       b.style.height = size + "px";
       b.style.left = Math.random() * 100 + "%";

@@ -152,7 +152,7 @@ def dimensionless_K(route: str, values: dict) -> dict:
         detail = f"K_RP = {fmt(krp)} L/g × 1000 g/L → K° = {fmt(k0)}"
     elif route == "freundlich":
         k0 = float(values["K_F"])
-        detail = f"K_F = {fmt(k0)} used directly — dimensionally invalid"
+        detail = f"K_F = {fmt(k0)} used directly (dimensionally invalid)"
     else:                                          # direct
         k0 = float(values["K0"])
         detail = f"K° = {fmt(k0)} supplied directly"
@@ -163,7 +163,7 @@ def dimensionless_K(route: str, values: dict) -> dict:
     elif k0 < 1:
         warn.append(
             f"K° = {fmt(k0)} is less than 1, so ln K° is negative and ΔG° will come "
-            f"out positive — i.e. the analysis says adsorption is non-spontaneous "
+            f"out positive: i.e. the analysis says adsorption is non-spontaneous "
             f"under standard-state conditions. That is a legitimate result, but if "
             f"your adsorbent clearly works, it usually means the K° conversion is "
             f"wrong rather than the thermodynamics."
@@ -246,7 +246,7 @@ def vant_hoff(T: np.ndarray, K0: np.ndarray, nonlinear: bool = False) -> dict:
     if out["R2"] < 0.95 and T.size >= 3:
         out["warnings"].append(
             f"The van't Hoff regression has R² = {out['R2']:.4f}. Below about 0.95 "
-            f"the extracted ΔH° and ΔS° are not reliable — check for an outlying "
+            f"the extracted ΔH° and ΔS° are not reliable; check for an outlying "
             f"temperature or a K° conversion that varies with temperature in a way "
             f"the model does not capture."
         )
@@ -303,7 +303,7 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
     if route_info:
         out.append(
             f"Equilibrium constant route: {K_ROUTES[route_info['route']]['label']}. "
-            f"{route_info['detail']}. This choice is not cosmetic — a different "
+            f"{route_info['detail']}. This choice is not cosmetic: a different "
             f"route gives a different ΔG°, so it must be stated explicitly in any "
             f"paper reporting these numbers."
         )
@@ -324,7 +324,7 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
             f"ΔG° is not negative at all temperatures ({fmt(min(dG))} to "
             f"{fmt(max(dG))} kJ/mol). A positive ΔG° means adsorption is "
             f"non-spontaneous under standard-state conditions at that temperature. "
-            f"Before reporting this, check the K° conversion — a positive ΔG° for "
+            f"Before reporting this, check the K° conversion, because a positive ΔG° for "
             f"an adsorbent that demonstrably removes the solute almost always "
             f"signals a units problem rather than real thermodynamics."
         )
@@ -333,7 +333,7 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
     if mag < 20:
         out.append(
             f"The magnitude of ΔG° (mean |ΔG°| ≈ {fmt(mag)} kJ/mol) lies in the "
-            f"0–20 kJ/mol range conventionally assigned to **physisorption** — "
+            f"0–20 kJ/mol range conventionally assigned to **physisorption**"
             f"the adsorbate is held by van der Waals forces, hydrogen bonding or "
             f"weak electrostatics."
         )
@@ -378,13 +378,13 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
         out.append(
             f"|ΔH°| = {fmt(amag)} kJ/mol sits in the 20–40 kJ/mol transition zone, "
             f"where physical and chemical contributions are both plausible. Do not "
-            f"claim a mechanism from this number alone — support it with the D–R "
+            f"claim a mechanism from this number alone, support it with the D–R "
             f"mean free energy E, spectroscopic evidence, or a reversibility test."
         )
     else:
         out.append(
             f"|ΔH°| = {fmt(amag)} kJ/mol exceeds 40 kJ/mol, which points to "
-            f"**chemisorption** — bond formation rather than physical attraction. "
+            f"**chemisorption**: bond formation rather than physical attraction. "
             f"Expect the process to be slow to reverse and the adsorbent hard to "
             f"regenerate without harsh conditions."
         )
@@ -420,7 +420,7 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
         out.append(
             f"Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
             f"contributes {fmt(enth)} kJ/mol and the entropy term (−TΔS°) "
-            f"contributes {fmt(entr)} kJ/mol. The process is **enthalpy-driven** — "
+            f"contributes {fmt(entr)} kJ/mol. The process is **enthalpy-driven**"
             f"the strength of the adsorbate–surface interaction, not the entropy "
             f"gain, is what makes it favourable."
         )
@@ -428,7 +428,7 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
         out.append(
             f"Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
             f"contributes {fmt(enth)} kJ/mol and the entropy term (−TΔS°) "
-            f"contributes {fmt(entr)} kJ/mol. The process is **entropy-driven** — "
+            f"contributes {fmt(entr)} kJ/mol. The process is **entropy-driven**"
             f"it proceeds because of the disorder gained (largely released "
             f"solvation water), not because binding is energetically strong. This "
             f"is the common situation for endothermic adsorption, where a positive "
@@ -486,7 +486,7 @@ def isosteric_heat(T_list, Ce_at_q, q_values) -> dict:
         if abs(sl) < 1e-3 * max(1.0, float(np.mean(np.abs(hs)))):
             trend = ("The isosteric heat is essentially constant with loading, "
                      "which is the signature of an energetically **homogeneous** "
-                     "surface — every site binds with the same enthalpy. This is "
+                     "surface: every site binds with the same enthalpy. This is "
                      "the assumption Langmuir makes, so a constant ΔH_iso supports "
                      "a Langmuir description.")
         elif sl > 0:
@@ -498,7 +498,7 @@ def isosteric_heat(T_list, Ce_at_q, q_values) -> dict:
         else:
             trend = ("|ΔH_iso| increases with loading, meaning later molecules bind "
                      "*more* strongly than earlier ones. That indicates "
-                     "**cooperative adsorption** — adsorbed molecules attract "
+                     "**cooperative adsorption**: adsorbed molecules attract "
                      "further adsorbate, as in surface aggregation or hemimicelle "
                      "formation. Cross-check it against a Hill coefficient above 1.")
 
@@ -573,7 +573,7 @@ def sticking_probability(T_list, theta_list) -> dict:
         note = (f"S* = {fmt(S)} lies between 0 and 1, the range in which the "
                 f"sticking-probability model is valid. It is read as the fraction "
                 f"of molecular collisions with the surface that result in "
-                f"adsorption — here about {S * 100:.1f}% of encounters stick.")
+                f"adsorption: here about {S * 100:.1f}% of encounters stick.")
     elif S > 1:
         note = (f"S* = {fmt(S)} exceeds 1, which is outside the model's valid range "
                 f"(a probability cannot exceed unity). The usual cause is that "

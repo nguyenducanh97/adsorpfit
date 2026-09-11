@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AdsorpFit — figure engine.
+   AdsorpFit: figure engine.
 
    Two renderers share one style object:
 
@@ -447,8 +447,8 @@ const Fig = (function () {
       pair(num("width_cm", "Width (cm)", 0.1, 2, 40),
            num("height_cm", "Height (cm)", 0.1, 2, 40)),
       pick("dpi", "Resolution (dpi)",
-           [[150, "150 — screen"], [300, "300 — journal minimum"],
-            [600, "600 — journal line art"], [900, "900"], [1200, "1200 — maximum"]]),
+           [[150, "150: screen"], [300, "300: journal minimum"],
+            [600, "600: journal line art"], [900, "900"], [1200, "1200: maximum"]]),
       check("transparent", "Transparent background"),
       check("tight", "Trim whitespace (tight bounding box)"),
       num("pad", "Padding", 0.05, 0, 3)

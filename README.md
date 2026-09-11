@@ -9,7 +9,7 @@ plain language. English and Korean interface.
 
 Everything runs locally. The Python scientific stack (NumPy, SciPy, Matplotlib)
 is loaded into the browser through WebAssembly, so unpublished data never leaves
-the machine — there is no server and no upload.
+the machine: there is no server and no upload.
 
 **Live site:** https://YOUR-USERNAME.github.io/adsorpfit/
 
@@ -19,15 +19,16 @@ the machine — there is no server and no upload.
 
 | | |
 |---|---|
-| **Kinetics** | 13 models — PFO, PSO, Elovich, Avrami, mixed 1,2-order, pseudo-*n*th-order, Ritchie, fractal-like PFO, Weber–Morris, film diffusion, Bangham, Crank homogeneous surface diffusion, double exponential |
-| **Isotherms** | 21 models across 2-, 3- and 4-parameter families — Langmuir, Freundlich, Temkin, Dubinin–Radushkevich, Jovanović, Halsey, Harkins–Jura, BET, Elovich, Sips, Tóth, Redlich–Peterson, Khan, Radke–Prausnitz, Hill, Koble–Corrigan, Brouers–Sotolongo, Vieth–Sladek, Fritz–Schlünder, Baudu, Marczewski–Jaroniec |
+| **Kinetics** | 13 models: PFO, PSO, Elovich, Avrami, mixed 1,2-order, pseudo-*n*th-order, Ritchie, fractal-like PFO, Weber–Morris, film diffusion, Bangham, Crank homogeneous surface diffusion, double exponential |
+| **Isotherms** | 21 models across 2-, 3- and 4-parameter families: Langmuir, Freundlich, Temkin, Dubinin–Radushkevich, Jovanović, Halsey, Harkins–Jura, BET, Elovich, Sips, Tóth, Redlich–Peterson, Khan, Radke–Prausnitz, Hill, Koble–Corrigan, Brouers–Sotolongo, Vieth–Sladek, Fritz–Schlünder, Baudu, Marczewski–Jaroniec |
 | **Thermodynamics** | van't Hoff (ΔG°, ΔH°, ΔS°) with six documented routes to a dimensionless K°, non-linear van't Hoff with ΔC*p*, isosteric heat vs. loading, Arrhenius *E*a, sticking probability |
 | **Diagnostics** | Weber–Morris multi-region segmentation with automatic breakpoint search, Boyd plot with a statistical test on the intercept |
 | **Statistics** | R², adjusted R², RMSE, SSE, χ², reduced χ², ARE, HYBRID, MPSD, EABS, MAE, Δ*q*, AIC, AICc, BIC, parameter standard errors, 95 % confidence intervals, *t* and *p* values, Akaike weights |
 | **Figures** | Full control of fonts, sizes, colours, markers, line styles, ticks, grid, legend, axis ranges, log scales, annotations, canvas size; export as PNG, TIFF, PDF, SVG, EPS, PS, JPEG, WebP, BMP at up to 1200 dpi |
 | **Tables** | CSV, TSV, XLSX, Markdown, LaTeX, HTML, JSON; plus curve data and a complete HTML report |
-| **Model advisor** | Reads the shape of your raw data — does it plateau? is it linear, sigmoidal? did the kinetics equilibrate? — then screens every model and sorts them into recommended / usable / not advised, each with a reason |
+| **Model advisor** | Reads the shape of your raw data, does it plateau? is it linear, sigmoidal? did the kinetics equilibrate?, then screens every model and sorts them into recommended / usable / not advised, each with a reason |
 | **Domain checking** | Every model is tested against its own range of validity before and after fitting, so a model cannot be reported from data it mathematically cannot describe |
+| **Layout** | Drag the bar between the columns to resize them, drag a panel by its header grip to reorder it, collapse any panel from its header, and drag the grip under a figure to change its height. All of it persists. |
 | **Workspace** | English and Korean, light / dark / system theme, three background-motion levels, three layout arrangements, two densities, and named projects saved in the browser with export and import |
 
 ---
@@ -52,7 +53,7 @@ are genuinely indistinguishable (Δ < 2) it says so rather than declaring a winn
 **ΔG° requires a dimensionless K°, and the route must be stated.** −RT ln K is
 undefined for a K with units. A Langmuir K_L in L mg⁻¹ is not dimensionless, and
 different unit choices for the same experiment give ΔG° values differing by tens
-of kJ mol⁻¹ — larger than the effect being reported. AdsorpFit makes you choose a
+of kJ mol⁻¹: larger than the effect being reported. AdsorpFit makes you choose a
 conversion route explicitly, prints the arithmetic it used, and marks the
 Freundlich route as not defensible because K_F has no well-defined standard
 state. See Lima et al. (2019) *J. Mol. Liq.* **273**, 425–434 and Tran &
@@ -63,7 +64,7 @@ these equations are unbounded below. Temkin contains ln(A_T·C_e) and diverges
 to −∞ as C_e → 0; Harkins–Jura has 1/(B − log C_e) and blows up at C_e = 10^B;
 liquid-phase BET has (C_s − C_e) in its denominator. Least squares has no
 objection to a negative loading, so a fit can reach R² = 0.96 while predicting
-q_e = −14 mg/g at your lowest point — not hypothetical, this is what prompted
+q_e = −14 mg/g at your lowest point, not hypothetical, this is what prompted
 the check. AdsorpFit tests each model's domain against your data before
 fitting, tests the fitted parameters against it afterwards, and blocks the
 result rather than quietly reporting it.
@@ -74,14 +75,14 @@ result rather than quietly reporting it.
 
 - Whether a model predicts negative or undefined values anywhere in your
   measured range, and the concentration at which it breaks down.
-- A parameter whose standard error exceeds the parameter itself — the data do not
+- A parameter whose standard error exceeds the parameter itself; the data do not
   determine it, whatever R² says.
 - *q*e,cal against *q*e,exp. A kinetic fit whose calculated equilibrium capacity
   disagrees with the measured one is wrong even at R² = 0.999. This catches more
   bad fits than R² does.
 - A fitted *q*max far above the highest measured loading, making it an
   extrapolation rather than a measurement.
-- A three- or four-parameter model that has collapsed onto a simpler one — Sips
+- A three- or four-parameter model that has collapsed onto a simpler one, Sips
   with *m* = 1 is Langmuir; Redlich–Peterson with *g* = 1 is Langmuir; Tóth with
   *n* = 1 is Langmuir.
 - A parameter pinned against a physical bound.
@@ -106,27 +107,27 @@ python validation/test_published.py
 python validation/test_domain.py
 ```
 
-**`test_recovery.py` — synthetic parameter recovery.** Each of the 34 models
+**`test_recovery.py`: synthetic parameter recovery.** Each of the 34 models
 generates data from known parameters with 1.5 % Gaussian noise; the engine must
 refit to within the noise floor (RMSE ≤ 1.6 σ). All 34 pass. The suite separately
-reports which models are *structurally non-identifiable* — Crank's *D* and *r*
+reports which models are *structurally non-identifiable*, Crank's *D* and *r*
 appear only as *D*/*r*², Khan's *q*max and *b*K only as their product at low
-*C*e — and verifies that the identifiable combination is recovered (to 2–4 %)
+*C*e: and verifies that the identifiable combination is recovered (to 2–4 %)
 even when the individual parameters are not. That is a property of those models,
 not a defect in the fitter, and the app says so rather than hiding it.
 
-**`test_published.py` — cross-check against the literature.** Verifies the
+**`test_published.py`: cross-check against the literature.** Verifies the
 derived-quantity relationships against papers that publish both the input
 constant and the quantity derived from it, which is where unit errors actually
 occur: *E* = 1/√(2K_ad) against a published *E* of 1581.14 J mol⁻¹; *B* = RT/b_T
 against 14.678; *h* = k₂q*e*² against 33.67 mg g⁻¹ min⁻¹; ΔG° = −RT ln K° against
 −1.6765 kJ mol⁻¹. It also round-trips published parameter sets through the full
 fitting engine (recovery exact to 10⁻⁶), and confirms the diagnostics fire on
-three genuinely defective fits that were published as they stand — a negative
+three genuinely defective fits that were published as they stand, a negative
 Langmuir *q*max, a *q*e,cal 235 % away from *q*e,exp, and a ΔG° near zero caused
 by an unconverted K. 16/16 pass.
 
-**`test_domain.py` — domain and validity regression tests.** Twenty checks
+**`test_domain.py`: domain and validity regression tests.** Twenty checks
 pinning the failure modes above: Temkin blocked on dilute data but allowed on
 mid-range data, BET blocked above C_s, Harkins–Jura past its singularity, Baudu
 outside 0 < 1+x+y < 1, saturation models warned about on non-saturating data,
@@ -146,7 +147,7 @@ papers' raw data into `validation/datasets/` would strengthen this further.
 ## Running it locally
 
 The app fetches its Python modules over HTTP, so opening `index.html` straight
-from disk will not work — the browser blocks it. Serve the folder instead:
+from disk will not work: the browser blocks it. Serve the folder instead:
 
 ```bash
 python -m http.server 8777
@@ -164,6 +165,11 @@ git branch -M main
 git push -u origin main
 ```
 
+**When you update the site**, bump `APP_VERSION` in `index.html` and the `?v=`
+query on every local `<script>` and `<link>`. Without that, browsers and the
+GitHub Pages CDN keep serving the previously cached JavaScript and CSS, and your
+changes will not appear.
+
 Then in the repository: **Settings → Pages → Source: Deploy from a branch →
 Branch: `main`, folder: `/ (root)` → Save**. The site appears at
 `https://YOUR-USERNAME.github.io/adsorpfit/` after a minute or two.
@@ -175,12 +181,14 @@ Branch: `main`, folder: `/ (root)` → Save**. The site appears at
 ```
 adsorpfit/
 ├── index.html              app shell
+├── assets/                 SWAT, SKKU and U-TOP marks
 ├── css/style.css           styling, water background, light and dark themes
 ├── js/
 │   ├── i18n.js             English / Korean dictionary and switching
 │   ├── prefs.js            theme, motion, layout, density + project storage
+│   ├── layout.js           column splitter, panel drag/collapse, plot resize
 │   ├── water.js            animated caustics and waves
-│   ├── plot.js             figure engine — one style object drives both the
+│   ├── plot.js             figure engine, one style object drives both the
 │   │                       Plotly preview and the Matplotlib export
 │   └── app.js              application controller
 ├── py/
@@ -202,7 +210,7 @@ The interface, the guide, the model names and the parameter descriptions are
 translated. The automatically generated interpretation paragraphs are still
 English: they are composed in Python with fitted numbers interpolated into
 them, so translating them means maintaining a parallel set of sentence
-templates in the Python layer — a separate piece of work, not a `t()` call.
+templates in the Python layer, a separate piece of work, not a `t()` call.
 The Korean strings would also benefit from a native-speaker review before you
 publish.
 
@@ -210,7 +218,7 @@ Each model is declared once, in a single `ModelSpec` carrying its equation, the
 physical meaning and units of every parameter, its bounds, a data-driven initial
 guess, its classical linearised forms, the original citation, and the function
 that turns the fitted numbers into prose. Adding a model means adding one
-`ModelSpec` — the picker, the fitting, the tables, the figures, the export and
+`ModelSpec`: the picker, the fitting, the tables, the figures, the export and
 the interpretation all follow from it.
 
 ---
@@ -218,8 +226,8 @@ the interpretation all follow from it.
 ## Citing the models
 
 Every model card in the app carries its primary citation, reachable from the **?**
-button beside the model name. Cite the original source — Lagergren 1898, Langmuir
-1918, Freundlich 1906, Ho & McKay 1999 — not a recent paper that happens to use
+button beside the model name. Cite the original source: Lagergren 1898, Langmuir
+1918, Freundlich 1906, Ho & McKay 1999, not a recent paper that happens to use
 the model.
 
 Key methodological references behind the design:

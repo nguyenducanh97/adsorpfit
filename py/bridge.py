@@ -250,7 +250,7 @@ def _ranking_prose(ranking, results):
         lines.append(
             f"However, {names} {'is' if len(close) == 1 else 'are'} statistically "
             f"indistinguishable from it (ΔAICc < 2). On these data you cannot "
-            f"claim one of these models is correct and the others are not — say "
+            f"claim one of these models is correct and the others are not, say "
             f"they describe the data equally well, and choose between them on "
             f"physical grounds rather than on fit statistics."
         )
@@ -259,7 +259,7 @@ def _ranking_prose(ranking, results):
         if second:
             lines.append(
                 f"The next best model, {second['model_name']}, is Δ = "
-                f"{second['delta']:.1f} behind — {second['evidence']}. The margin "
+                f"{second['delta']:.1f} behind: {second['evidence']}. The margin "
                 f"is large enough to prefer {best['model_name']} on statistical "
                 f"grounds."
             )
@@ -389,11 +389,11 @@ def _segment_weber_morris(sq, q, n_seg):
 
     labels = {
         1: ["external surface adsorption (instantaneous stage)"],
-        2: ["stage 1 — external surface adsorption / film diffusion",
-            "stage 2 — intraparticle diffusion (rate-limiting)"],
-        3: ["stage 1 — external surface adsorption / film diffusion",
-            "stage 2 — intraparticle diffusion (rate-limiting)",
-            "stage 3 — equilibrium plateau, diffusion slows as sites fill"],
+        2: ["stage 1: external surface adsorption / film diffusion",
+            "stage 2: intraparticle diffusion (rate-limiting)"],
+        3: ["stage 1: external surface adsorption / film diffusion",
+            "stage 2: intraparticle diffusion (rate-limiting)",
+            "stage 3: equilibrium plateau, diffusion slows as sites fill"],
     }.get(len(best), [f"stage {i + 1}" for i in range(len(best))])
 
     out = []
@@ -419,7 +419,7 @@ def _segment_weber_morris(sq, q, n_seg):
                "takes over and slows the process."
                if slower else
                "Unusually, the second stage is faster than the first. Check the "
-               "segmentation — this can happen when the first region contains too "
+               "segmentation: this can happen when the first region contains too "
                "few points to define a slope."))
     else:
         out_note = ("Only one linear region was resolved. If the whole plot really "
