@@ -71,12 +71,51 @@
     return v.toPrecision(sig).replace(/\.?0+$/, "").replace(/\.$/, "");
   }
 
-  // Minimal, safe markdown: **bold**, *italic*, `code`. Everything else is
-  // escaped, because interpretation strings are composed from fitted numbers
-  // and we never want them parsed as HTML.
+  const SUB_DIGITS = { "₀": "0", "₁": "1", "₂": "2", "₃": "3",
+                       "₄": "4", "₅": "5", "₆": "6", "₇": "7",
+                       "₈": "8", "₉": "9" };
+  const SUP_CHARS = { "⁰": "0", "¹": "1", "²": "2", "³": "3",
+                      "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7",
+                      "⁸": "8", "⁹": "9", "⁻": "−",
+                      "⁺": "+", "ᵅ": "α", "·": "." };
+
+  // Normalise scientific notation to one rendered form.
+  //
+  // The model library was written over time in two notations: ASCII
+  // underscores (q_max, C_e, k_2) and Unicode subscripts. Both were shown
+  // literally, so a parameter appeared in a table as "q_max". Rather than
+  // rewrite six hundred strings, and risk breaking the very lookup tables
+  // that map those characters, both forms are converted here to <sub> and
+  // <sup>. Greek letters and the degree sign are left alone: they are real
+  // characters, not notation workarounds.
+  function sci(s) {
+    return s
+      // Unicode runs first, so a following ASCII rule cannot split them
+      .replace(/[₀-₉]+/g, function (run) {
+        return "<sub>" + run.replace(/./g, function (c) {
+          return SUB_DIGITS[c] || c; }) + "</sub>";
+      })
+      .replace(/[⁰¹²³⁴-⁹⁺⁻ᵅ·]+/g,
+        function (run) {
+          // a lone middle dot is punctuation, not an exponent
+          if (!/[⁰¹²³⁴-⁹⁻ᵅ]/.test(run)) return run;
+          return "<sup>" + run.replace(/./g, function (c) {
+            return SUP_CHARS[c] || c; }) + "</sup>";
+        })
+      // braced forms, e.g. q_{e,cal} and 10^{B}
+      .replace(/([A-Za-z])_\{([^}]{1,10})\}/g, "$1<sub>$2</sub>")
+      .replace(/\^\{([^}]{1,10})\}/g, "<sup>$1</sup>")
+      // bare forms, e.g. q_max and R^2
+      .replace(/([A-Za-z])_([A-Za-z0-9]{1,6})(?![A-Za-z0-9_])/g, "$1<sub>$2</sub>")
+      .replace(/\^(−?-?[0-9A-Za-z.]{1,4})/g, "<sup>$1</sup>");
+  }
+
+  // Minimal, safe markdown: **bold**, *italic*, `code`, plus the scientific
+  // notation above. Everything else is escaped, because these strings are
+  // composed from fitted numbers and must never be parsed as HTML.
   function md(s) {
-    return String(s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    return sci(String(s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
       .replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -120,6 +159,28 @@
       console.warn("KaTeX could not render:", latex, e);
       return null;
     }
+  }
+
+  // Render a parameter symbol as maths. Model metadata carries a `tex` field
+  // derived from the symbol; the plain `symbol` remains the fallback and is
+  // what the CSV and LaTeX exports use, since those want text.
+  function symbolNode(meta, opts) {
+    opts = opts || {};
+    const html = tex(meta.tex, { display: false });
+    if (html) {
+      return el("span", { class: "sym" + (opts.cls ? " " + opts.cls : ""),
+                          html: html, title: meta.symbol });
+    }
+    return el("span", { class: "sym-fallback", text: meta.symbol });
+  }
+
+  function unitNode(meta) {
+    if (!meta.unit || meta.unit === "–" || meta.unit === "-") {
+      return el("span", { class: "tiny", text: "–" });
+    }
+    const html = meta.unit_tex ? tex(meta.unit_tex, { display: false }) : null;
+    if (html) return el("span", { class: "sym unit", html: html });
+    return el("span", { class: "tiny", text: meta.unit });
   }
 
   function equationNode(model, opts) {
@@ -280,7 +341,12 @@
                 text: m.citation }),
       el("div", { class: "section-title", text: "Parameters" }),
       el("dl", { class: "kv" }, m.params.reduce(function (acc, p) {
-        acc.push(el("dt", { text: p.symbol + (p.unit && p.unit !== "–" ? " (" + p.unit + ")" : "") }));
+        const dt = el("dt", {}, [symbolNode(p)]);
+        if (p.unit && p.unit !== "–" && p.unit !== "-") {
+          dt.appendChild(document.createTextNode(" "));
+          dt.appendChild(unitNode(p));
+        }
+        acc.push(dt);
         acc.push(el("dd", { text: p.meaning }));
         return acc;
       }, [])),
@@ -1352,6 +1418,18 @@
 
   /* ---------------------------------------------------------- params pane */
 
+  // Friendly names for the quantities models compute on the side. Without
+  // these the raw key leaks into the table.
+  const DERIVED_LABELS = {
+    "t_half": "t_1/2, half-time",
+    "t_95": "t_95, time to 95% of equilibrium",
+    "h_initial_rate": "h, initial adsorption rate",
+    "E_kJ_mol": "E, mean free energy of adsorption",
+    "R_L": "R_L, separation factor",
+    "B": "B, Temkin heat constant",
+    "qmax_equiv": "q_max equivalent (K_RP/a_RP)"
+  };
+
   function renderParams(cat) {
     const res = STATE[cat].fit;
     const wrap = el("div");
@@ -1408,8 +1486,8 @@
             const v = m.params[p.key], se = m.stderr[p.key], ci = m.ci95[p.key];
             const pv = m.pvalue[p.key];
             return el("tr", {}, [
-              el("td", { text: p.symbol }),
-              el("td", { class: "tiny", text: p.unit }),
+              el("td", {}, [symbolNode(p)]),
+              el("td", {}, [unitNode(p)]),
               el("td", { class: "num", text: fmt(v, 5) }),
               el("td", { class: "num", text: fmt(se, 3) }),
               el("td", { class: "num", text: ci && ci[0] !== null
@@ -1427,7 +1505,9 @@
         const dl = el("dl", { class: "kv" });
         Object.keys(m.derived).forEach(function (k) {
           const v = m.derived[k];
-          dl.appendChild(el("dt", { text: k.replace(/_/g, " ") }));
+          // these keys are symbols (t_half, h_initial_rate, E_kJ_mol), so they
+          // get the same subscript treatment as everything else
+          dl.appendChild(el("dt", { html: md(DERIVED_LABELS[k] || k) }));
           dl.appendChild(el("dd", { text: Array.isArray(v)
             ? v.map(function (q) { return fmt(q, 4); }).join(", ")
             : fmt(v, 5) }));
@@ -1676,7 +1756,7 @@
                 const a = lf.params[p.key], b = nonlin[p.key];
                 const diff = (a !== null && b) ? (100 * (a - b) / b) : null;
                 return el("tr", {}, [
-                  el("td", { text: p.symbol }),
+                  el("td", {}, [symbolNode(p)]),
                   el("td", { class: "num", text: fmt(a, 5) }),
                   el("td", { class: "num", text: fmt(b, 5) }),
                   el("td", { class: "num", text: diff === null ? "":
@@ -1847,7 +1927,12 @@
       if (!m.success) return;
       m.param_meta.forEach(function (p) {
         rows.push({
-          model: m.model_name, parameter: p.symbol, unit: p.unit,
+          model: m.model_name,
+          // LaTeX export wants "$q_{\mathrm{max}}$"; every other format wants
+          // the plain symbol, which is what spreadsheets and CSV readers expect
+          parameter: p.symbol,
+          parameter_tex: p.tex ? "$" + p.tex + "$" : p.symbol,
+          unit: p.unit,
           value: m.params[p.key], stderr: m.stderr[p.key],
           ci_low: m.ci95[p.key] ? m.ci95[p.key][0] : null,
           ci_high: m.ci95[p.key] ? m.ci95[p.key][1] : null,
@@ -1905,8 +1990,12 @@
         toast("Workbook downloaded.", "good");
         return;
       }
+      const cols = PARAM_COLS.map(function (c) {
+        return (format === "latex" && c.key === "parameter")
+          ? { key: "parameter_tex", label: c.label } : c;
+      });
       const r = call("export_table", {
-        rows: rows, columns: PARAM_COLS, format: format,
+        rows: rows, columns: cols, format: format,
         caption: "Fitted " + cat + " model parameters (AdsorpFit)"
       });
       if (toClipboard) { navigator.clipboard.writeText(r.text); toast("Copied.", "good"); }
@@ -1950,6 +2039,8 @@
       "h3{font-size:15px;margin-top:22px}table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0}",
       "th,td{border:1px solid #cfe0e8;padding:6px 9px;text-align:left}th{background:#eef6f9}",
       "li{margin-bottom:8px}code{background:#eef6f9;padding:1px 5px;border-radius:3px}",
+      "sub{font-size:.72em;vertical-align:-0.28em;line-height:0}",
+      "sup{font-size:.72em;vertical-align:0.45em;line-height:0}",
       ".eq{background:#f4fafc;border:1px solid #cfe0e8;padding:10px;text-align:center;font-family:Georgia,serif}",
       "</style></head><body>",
       "<h1>AdsorpFit report" + cat + "</h1>",
@@ -1983,7 +2074,7 @@
                  "<th>Std. error</th><th>95% CI</th></tr>");
       m.param_meta.forEach(function (p) {
         const ci = m.ci95[p.key];
-        parts.push("<tr><td>" + esc(p.symbol) + "</td><td>" + esc(p.unit) +
+        parts.push("<tr><td>" + md(p.symbol) + "</td><td>" + md(p.unit) +
           "</td><td>" + fmt(m.params[p.key], 5) + "</td><td>" +
           fmt(m.stderr[p.key], 3) + "</td><td>" +
           (ci && ci[0] !== null ? fmt(ci[0], 4) + " … " + fmt(ci[1], 4) : "n.d.") +
@@ -2017,7 +2108,7 @@
   // rather than a KeyError from the Python side.
   const ROUTE_NEEDS = {
     langmuir_molar: { field: "K_L", param: "KL", models: ["langmuir"],
-                      label: "the Langmuir constant K_L" },
+                      label: "the Langmuir constant K_L", labelHtml: true },
     redlich_peterson: { field: "K_RP", param: "KRP", models: ["redlich_peterson"],
                         label: "the Redlich–Peterson constant K_RP" },
     freundlich: { field: "K_F", param: "KF", models: ["freundlich"],
@@ -2134,7 +2225,7 @@
         const wanted = CATALOGUE.isotherm.find(function (m) {
           return m.key === need.models[0];
         });
-        toast('This K° route needs ' + need.label + ', which only the ' +
+        toast('This K° route needs ' + need.label.replace(/_/g, "") + ', which only the ' +
               wanted.name + ' model provides. Either switch the isotherm model ' +
               'to ' + wanted.name + ', or choose a K° route that does not depend ' +
               'on a specific model (K_D or K_C).', "bad", 11000);
@@ -2326,7 +2417,7 @@
     });
     if (rows.length) {
       figs.isosteric = {
-        label: "Isosteric heat: ΔH_iso vs loading",
+        label: "Isosteric heat: ΔHᵢₛₒ vs loading",
         traces: [{
           kind: "scatter", x: rows.map(function (r) { return r.q; }),
           y: rows.map(function (r) { return r.dH_iso_kJ_mol; }),
@@ -2388,7 +2479,7 @@
         el("h2", { text: "Thermodynamic parameters" }),
         el("span", { class: "hint" }, [
           el("span", { class: "chip " + (res.route_defensible ? "info" : "bad"),
-                       text: res.route_label })
+                       html: md(res.route_label) })
         ])
       ])
     ]);
@@ -2467,7 +2558,7 @@
         el("table", { class: "data" }, [
           el("thead", {}, [el("tr", {}, [
             el("th", { class: "num", text: "q (mg/g)" }),
-            el("th", { class: "num", text: "ΔH_iso (kJ/mol)" }),
+            el("th", { class: "num", html: md("ΔH_iso") + " (kJ/mol)" }),
             el("th", { class: "num", text: "± " }),
             el("th", { class: "num", text: "R²" })
           ])]),

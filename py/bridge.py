@@ -12,6 +12,7 @@ import base64
 import io
 import json
 import math
+import re
 import traceback
 
 import numpy as np
@@ -62,6 +63,44 @@ def _err(msg, detail=""):
 # model catalogue
 # --------------------------------------------------------------------------
 
+def unit_to_tex(unit: str) -> str:
+    """Render a unit string as LaTeX.
+
+    Units are written with Unicode superscripts (mg g-1) which read well in
+    running text but sit awkwardly beside a KaTeX symbol, and a few carry
+    exponents that Unicode cannot express at all, such as (L mg-1)^m.
+    """
+    if not unit or unit in ("-", "–"):
+        return ""
+    u = unit
+    sup = {"⁻": "-", "¹": "1", "²": "2", "³": "3",
+           "⁴": "4", "⁵": "5", "⁰": "0", "·": ".",
+           "⁵": "5", "ᵅ": "a"}
+    out, i = [], 0
+    while i < len(u):
+        ch = u[i]
+        if ch in sup:
+            run = ""
+            while i < len(u) and u[i] in sup:
+                run += sup[u[i]]
+                i += 1
+            out.append("^{%s}" % run)
+            continue
+        out.append(ch)
+        i += 1
+    t = "".join(out)
+    t = t.replace("^(1/n)", "^{1/n}").replace("^m", "^{m}").replace("^g", "^{g}")
+    t = t.replace("^α", "^{" + chr(92) + "alpha}")
+    # Unit names are upright text, not italic variables. Longest first, so
+    # "mol" is not matched as "m" then "ol", nor "mg" as "m" then "g".
+    for word in ("mol", "min", "mg", "kg", "cm", "L", "g", "h", "s",
+                 "J", "K", "d"):
+        # a lambda replacement avoids re.sub parsing the backslash in
+        # \mathrm as an escape sequence
+        t = re.sub(r"(?<![A-Za-z\{])" + word + r"(?![A-Za-z}])",
+                   lambda m, w=word: "\mathrm{" + w + "}", t)
+    return t
+
 def list_models(category: str = "all") -> str:
     """Return the full metadata catalogue for the model picker."""
     out = []
@@ -77,7 +116,8 @@ def list_models(category: str = "all") -> str:
             "requires": m.requires,
             "notes": m.notes,
             "params": [{
-                "key": p.key, "symbol": p.symbol, "unit": p.unit,
+                "key": p.key, "symbol": p.symbol, "tex": p.symbol_tex,
+                "unit": p.unit, "unit_tex": unit_to_tex(p.unit),
                 "meaning": p.meaning, "lower": _clean(p.lower),
                 "upper": _clean(p.upper),
             } for p in m.params],
@@ -151,7 +191,9 @@ def fit(payload_json: str) -> str:
                     "params": {}, "stderr": {}, "ci95": {}, "tvalue": {},
                     "pvalue": {}, "stats": {}, "warnings": [], "issues": [],
                     "param_meta": [{"key": q.key, "symbol": q.symbol,
-                                    "unit": q.unit, "meaning": q.meaning}
+                                    "tex": q.symbol_tex, "unit": q.unit,
+                                    "unit_tex": unit_to_tex(q.unit),
+                                    "meaning": q.meaning}
                                    for q in spec.params],
                 })
                 continue
@@ -238,7 +280,8 @@ def _result_to_dict(r, spec, ctx, with_curve=True):
         "equation": spec.equation, "equation_plain": spec.equation_plain,
         "citation": spec.citation, "assumptions": spec.assumptions,
         "family": spec.family, "category": spec.category,
-        "param_meta": [{"key": p.key, "symbol": p.symbol, "unit": p.unit,
+        "param_meta": [{"key": p.key, "symbol": p.symbol, "tex": p.symbol_tex,
+                        "unit": p.unit, "unit_tex": unit_to_tex(p.unit),
                         "meaning": p.meaning} for p in spec.params],
     }
     if r.success and with_curve and r._fn is not None:

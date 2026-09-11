@@ -223,6 +223,27 @@ def check_external():
         add("WARN", "network", "CDN tags carry no crossorigin attribute")
 
 
+def check_notation():
+    """Parameter symbols must all convert to valid LaTeX for the tables."""
+    sys.path.insert(0, "py")
+    from isotherms import ISOTHERM_MODELS
+    from kinetics import KINETIC_MODELS
+    models = dict(ISOTHERM_MODELS)
+    models.update(KINETIC_MODELS)
+    bad = 0
+    total = 0
+    for key, m in models.items():
+        for prm in m.params:
+            total += 1
+            t = prm.symbol_tex
+            if not t or ("_" in t and "{" not in t) or re.search(u"[₀-₉]", t):
+                add("ERROR", "notation", "%s.%s renders as %r" % (key, prm.key, t))
+                bad += 1
+    if not bad:
+        add("OK", "notation",
+            "%d parameter symbols convert to LaTeX cleanly" % total)
+
+
 def check_licence():
     if not os.path.exists("LICENSE"):
         add("ERROR", "legal", "no LICENSE file")
@@ -255,7 +276,7 @@ if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     for fn in (check_i18n, check_models, check_presets, check_assets,
                check_cache_busting, check_hygiene, check_external,
-               check_licence, check_accessibility):
+               check_notation, check_licence, check_accessibility):
         try:
             fn()
         except Exception as exc:
