@@ -1,10 +1,10 @@
 /* ==========================================================================
-   AdsorpFit — display preferences and saved projects.
+   AdsorpFit: display preferences and saved projects.
 
    Preferences (theme, background motion, layout, density) and projects both
    live in localStorage, which means they are per-browser and per-device.
    That is a deliberate trade: there is no server, so nothing you enter is
-   ever transmitted — but a project saved here will not follow you to another
+   ever transmitted, but a project saved here will not follow you to another
    machine unless you export it to a file.
    ========================================================================== */
 
@@ -26,7 +26,7 @@ const Prefs = (function () {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) state = Object.assign({}, DEFAULTS, JSON.parse(raw));
-    } catch (e) { /* private mode, blocked storage — defaults are fine */ }
+    } catch (e) { /* private mode, blocked storage; defaults are fine */ }
     // honour the OS setting for people who asked for reduced motion, unless
     // they have explicitly chosen otherwise in this app
     try {
