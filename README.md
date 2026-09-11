@@ -181,9 +181,12 @@ Branch: `main`, folder: `/ (root)` → Save**. The site appears at
 ```
 adsorpfit/
 ├── index.html              app shell
-├── assets/                 SWAT, SKKU and U-TOP marks (source PNGs)
+├── assets/                 SWAT, SKKU and U-TOP marks: source PNGs plus the
+│                           light variants used by the dark theme
+├── tools/make_marks.py     regenerates the light variants and css/marks.css
 ├── css/
-│   ├── marks.css           the three institutional logos, inlined as data URIs
+│   ├── marks.css           the logos inlined as data URIs, one variant per
+│   │                       theme, both transparent (generated, do not edit)
 │   └── style.css           styling, water background, light and dark themes
 ├── js/
 │   ├── i18n.js             English / Korean dictionary and switching

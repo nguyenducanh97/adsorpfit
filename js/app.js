@@ -368,7 +368,8 @@
     return ctx;
   }
 
-  async function runFit(cat) {
+  async function runFit(cat, opts) {
+    opts = opts || {};
     const data = readData(cat);
     if (!data) return;
 
@@ -404,8 +405,10 @@
         } catch (e) { STATE.kinetics.diffusion = null; }
       }
       renderResults(cat);
-      toast(I18N.t("msg.fitted", { n: models.length }), "good");
-      scrollToResults(cat);
+      if (!opts.silent) {
+        toast(I18N.t("msg.fitted", { n: models.length }), "good");
+        scrollToResults(cat);
+      }
     } catch (e) {
       toast("Fitting failed: " + e.message, "bad", 8000);
     } finally {
@@ -416,7 +419,8 @@
 
   /* =============================================================== advisor */
 
-  async function runAdvisor(cat) {
+  async function runAdvisor(cat, opts) {
+    opts = opts || {};
     const data = readData(cat);
     if (!data) return;
     const pref = cat === "kinetics" ? "kin" : "iso";
@@ -1777,10 +1781,11 @@
     });
   }
 
-  async function runThermo() {
+  async function runThermo(opts) {
+    opts = opts || {};
     const boxes = $$("#th-datasets > .panel");
     if (boxes.length < 2) {
-      toast("At least two temperatures are needed.", "bad"); return;
+      if (!opts.silent) toast("At least two temperatures are needed.", "bad"); return;
     }
     const datasets = [];
     for (const b of boxes) {
@@ -1794,7 +1799,7 @@
       datasets.push({ T: T, x: p.columns[0], y: p.columns[1] });
     }
     if (datasets.length < 2) {
-      toast("At least two temperatures with data are needed.", "bad"); return;
+      if (!opts.silent) toast("At least two temperatures with data are needed.", "bad"); return;
     }
 
     const btn = $("#th-run");
@@ -1881,7 +1886,7 @@
       res._datasets = datasets;
       STATE.thermo.result = res;
       renderThermo();
-      toast("Thermodynamic analysis complete.", "good");
+      if (!opts.silent) toast(I18N.t("msg.thermoDone"), "good");
     } catch (e) {
       toast("Analysis failed: " + e.message, "bad", 8000);
     } finally {
@@ -2439,12 +2444,36 @@
 
   /* ======================================================== projects drawer */
 
+  function activeTab() {
+    const b = $("#tabs button[aria-selected=true]");
+    return b ? b.dataset.tab : "kinetics";
+  }
+
+  function activeSub(cat) {
+    const b = $("#" + cat + "-subtabs button[aria-selected=true]");
+    return b ? b.dataset.sub : null;
+  }
+
   function snapshot() {
     // Everything needed to restore a working session. Raw text is stored
     // rather than parsed arrays so the user sees exactly what they typed.
     return {
       version: Projects.VERSION,
       savedAt: new Date().toISOString(),
+      // What was on screen, so reopening a project restores the view and not
+      // just the inputs. Fits are re-run rather than stored: the results run
+      // to megabytes and would exhaust the browser's storage after a few
+      // projects, whereas re-fitting takes a few seconds and cannot go stale.
+      view: {
+        tab: activeTab(),
+        kineticsSub: activeSub("kinetics"),
+        isothermSub: activeSub("isotherm"),
+        kineticsFitted: !!STATE.kinetics.fit,
+        isothermFitted: !!STATE.isotherm.fit,
+        kineticsAdvised: !!STATE.kinetics.advice,
+        isothermAdvised: !!STATE.isotherm.advice,
+        thermoRun: !!STATE.thermo.result
+      },
       kinetics: {
         data: $("#kin-data").value,
         tunit: $("#kin-tunit").value, qunit: $("#kin-qunit").value,
@@ -2519,13 +2548,53 @@
     if (rs && rs.onchange) rs.onchange();
 
     ["kinetics", "isotherm"].forEach(function (c) {
-      STATE[c].fit = null; STATE[c].advice = null;
+      STATE[c].fit = null; STATE[c].advice = null; STATE[c].frames = null;
       $(c === "kinetics" ? "#kin-results" : "#iso-results").innerHTML = "";
       renderAdvice(c);
       if ($(c === "kinetics" ? "#kin-data" : "#iso-data").value.trim()) readData(c);
     });
     STATE.thermo.result = null;
+    STATE.thermo.figures = null;
     $("#th-results").innerHTML = "";
+
+    return replayView(p.view);
+  }
+
+  // Re-run whatever had been computed when the project was saved, so the
+  // results, figures and open tab come back rather than an empty right-hand
+  // column. Each step is guarded: a project saved from a half-finished
+  // session should still open.
+  async function replayView(view) {
+    if (!view) return;
+    const jobs = [];
+    if (view.kineticsFitted) jobs.push(["kinetics", "fit"]);
+    if (view.isothermFitted) jobs.push(["isotherm", "fit"]);
+    if (view.kineticsAdvised) jobs.push(["kinetics", "advise"]);
+    if (view.isothermAdvised) jobs.push(["isotherm", "advise"]);
+
+    if (jobs.length) toast(I18N.t("proj.rebuilding"), null, 6000);
+    for (const [cat, what] of jobs) {
+      try {
+        if (what === "fit") await runFit(cat, { silent: true });
+        else await runAdvisor(cat, { silent: true });
+      } catch (e) {
+        console.warn("could not replay", cat, what, e);
+      }
+    }
+    if (view.thermoRun) {
+      try { await runThermo({ silent: true }); }
+      catch (e) { console.warn("could not replay thermodynamics", e); }
+    }
+
+    if (view.tab) {
+      const b = $('#tabs button[data-tab="' + view.tab + '"]');
+      if (b) b.click();
+    }
+    ["kinetics", "isotherm"].forEach(function (c) {
+      const want = view[c + "Sub"];
+      if (want && STATE[c].fit && $("#" + c + "-subtabs")) showSub(c, want);
+    });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
 
   // Show which project is open, so saving over the right one is obvious.
@@ -2668,12 +2737,12 @@
           ]));
           row.appendChild(el("div", { class: "pa" }, [
             el("button", { class: "btn sm", text: I18N.t("btn.load"),
-              onclick: function () {
-                restore(p.payload);
+              onclick: async function () {
                 STATE.projectId = p.id; STATE.projectName = p.name;
                 refreshProjectBadge();
-                toast(I18N.t("proj.loaded"), "good");
                 closeDrawer();
+                await restore(p.payload);
+                toast(I18N.t("proj.loaded"), "good");
               } }),
             el("button", { class: "btn sm", text: I18N.t("btn.rename"),
                            onclick: function () { renderRow("rename"); } }),

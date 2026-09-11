@@ -895,16 +895,30 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
    Toolbar buttons, focus mode and panel resizing
    ========================================================================== */
 
+/* Proportions taken from BrineFlow's .tb so the two toolbars match. */
 .tool-btn {
-  appearance: none; font: inherit; font-size: 12.5px; font-weight: 650;
+  appearance: none; font: inherit; font-size: 12.2px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 11px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface);
-  color: var(--text-2); transition: all .15s; white-space: nowrap;
+  background: color-mix(in srgb, var(--ocean-600) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ocean-600) 28%, transparent);
+  color: var(--text-2); transition: .16s; white-space: nowrap;
+  position: relative;
 }
-.tool-btn:hover { border-color: var(--border-strong); color: var(--text);
-                  background: var(--surface-2); }
-.tool-btn .ti { font-size: 13px; line-height: 1; opacity: .85; }
+.tool-btn:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent); color: var(--text);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 26%, transparent);
+  transform: translateY(-1px);
+}
+:root[data-motion="off"] .tool-btn:hover { transform: none; }
+:root[data-theme="dark"] .tool-btn {
+  background: rgba(255, 255, 255, .08);
+  border-color: rgba(150, 220, 235, .25);
+  color: #dff4f8;
+}
+.tool-btn .ti { display: grid; place-items: center; opacity: .9; }
+.tool-btn .ti svg { display: block; }
 .proj-badge {
   max-width: 140px; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-weight: 600; font-size: 11.5px;
@@ -983,22 +997,17 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 
 .brandwrap { display: flex; align-items: center; gap: 12px; position: relative; }
 
+/* The mark sits on the page itself, with no plate behind it: the dark theme
+   swaps to the light artwork instead, so both variants stay transparent. */
 .labchip {
   display: flex; align-items: center; gap: 9px;
-  padding: 6px 11px; border-radius: 11px;
-  background: rgba(255, 255, 255, .94);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, .18),
-              inset 0 0 0 1px rgba(255, 255, 255, .5);
-  transition: transform .2s, box-shadow .2s;
+  padding: 2px 4px; border-radius: 9px;
+  transition: transform .2s, filter .2s;
   flex: none;
 }
 .labchip:hover { transform: translateY(-1px);
-                 box-shadow: 0 6px 22px rgba(55, 200, 207, .35); }
+                 filter: drop-shadow(0 2px 8px rgba(55, 200, 207, .45)); }
 .labchip .mark { height: 26px; }
-:root[data-theme="dark"] .labchip {
-  box-shadow: 0 2px 14px rgba(0, 0, 0, .3),
-              inset 0 0 0 1px rgba(255, 255, 255, .5);
-}
 :root[data-motion="off"] .labchip:hover { transform: none; }
 
 .vr {
@@ -1046,12 +1055,7 @@ footer.site-foot a:hover { text-decoration: underline; }
 .fbrand a:hover .mark { opacity: 1; }
 .fbrand > span:last-child { line-height: 1.5; }
 
-/* The marks are dark artwork on transparency, so on the dark theme they get
-   the same white plate the header chip uses rather than being inverted. */
-:root[data-theme="dark"] .fbrand .mark {
-  background-color: rgba(255, 255, 255, .94);
-  border-radius: 7px; padding: 4px 9px; box-sizing: content-box;
-}
+
 
 .contact {
   display: flex; align-items: center; gap: 10px;
