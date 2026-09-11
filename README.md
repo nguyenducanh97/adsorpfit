@@ -11,7 +11,7 @@ Everything runs locally. The Python scientific stack (NumPy, SciPy, Matplotlib)
 is loaded into the browser through WebAssembly, so unpublished data never leaves
 the machine: there is no server and no upload.
 
-**Live site:** https://YOUR-USERNAME.github.io/adsorpfit/
+**Live site:** https://nguyenducanh97.github.io/adsorpfit/
 
 ---
 
@@ -224,7 +224,7 @@ Then open <http://localhost:8777>.
 ## Publishing to GitHub Pages
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/adsorpfit.git
+git remote add origin https://github.com/nguyenducanh97/adsorpfit.git
 git branch -M main
 git push -u origin main
 ```
@@ -236,7 +236,7 @@ changes will not appear.
 
 Then in the repository: **Settings → Pages → Source: Deploy from a branch →
 Branch: `main`, folder: `/ (root)` → Save**. The site appears at
-`https://YOUR-USERNAME.github.io/adsorpfit/` after a minute or two.
+`https://nguyenducanh97.github.io/adsorpfit/` after a minute or two.
 
 ---
 
