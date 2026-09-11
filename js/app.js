@@ -2587,20 +2587,86 @@
       if (!list.length) {
         body.appendChild(el("p", { class: "tiny", text: I18N.t("proj.none") }));
       }
+      // Rename and delete happen inside the drawer rather than through
+      // window.prompt and window.confirm. Native dialogs are suppressed in a
+      // number of contexts (sandboxed frames, background tabs, and once a
+      // user has ticked "prevent this page from creating additional
+      // dialogs"). When they are suppressed prompt returns null and confirm
+      // returns false, so both actions silently did nothing.
       list.forEach(function (p) {
-        const when = new Date(p.modified);
-        body.appendChild(el("div", { class: "proj-item" }, [
-          el("div", { class: "pb" }, [
-            el("div", { class: "pn" }, [
-              el("span", { text: p.name }),
-              p.id === STATE.projectId
-                ? el("span", { class: "chip info", style: "margin-left:6px",
-                               text: I18N.t("proj.current") }) : null
-            ]),
+        const row = el("div", { class: "proj-item" });
+
+        function renderRow(mode) {
+          row.innerHTML = "";
+          row.classList.toggle("confirming", mode === "delete");
+
+          if (mode === "rename") {
+            const input = el("input", { type: "text", value: p.name });
+            function commit() {
+              const nm = input.value.trim();
+              if (!nm) { renderRow(); return; }
+              Projects.rename(p.id, nm);
+              p.name = nm;
+              if (STATE.projectId === p.id) {
+                STATE.projectName = nm;
+                refreshProjectBadge();
+              }
+              toast(I18N.t("proj.renamed"), "good");
+              renderRow();
+            }
+            input.onkeydown = function (e) {
+              if (e.key === "Enter") { e.preventDefault(); commit(); }
+              if (e.key === "Escape") { e.preventDefault(); renderRow(); }
+            };
+            row.appendChild(el("div", { class: "pb" }, [input]));
+            row.appendChild(el("div", { class: "pa" }, [
+              el("button", { class: "btn sm primary", text: I18N.t("btn.save"),
+                             onclick: commit }),
+              el("button", { class: "btn sm", text: I18N.t("btn.cancel"),
+                             onclick: function () { renderRow(); } })
+            ]));
+            setTimeout(function () { input.focus(); input.select(); }, 20);
+            return;
+          }
+
+          if (mode === "delete") {
+            row.appendChild(el("div", { class: "pb" }, [
+              el("div", { class: "pn", text: I18N.t("proj.confirmDelete") }),
+              el("div", { class: "pd", text: p.name })
+            ]));
+            row.appendChild(el("div", { class: "pa" }, [
+              el("button", { class: "btn sm danger", text: I18N.t("btn.delete"),
+                onclick: function () {
+                  Projects.remove(p.id);
+                  if (STATE.projectId === p.id) {
+                    STATE.projectId = null; STATE.projectName = "";
+                    refreshProjectBadge();
+                  }
+                  toast(I18N.t("proj.deleted"), "good");
+                  closeDrawer(); openProjects();
+                } }),
+              el("button", { class: "btn sm", text: I18N.t("btn.cancel"),
+                             onclick: function () { renderRow(); } })
+            ]));
+            return;
+          }
+
+          const when = new Date(p.modified);
+          const nameEl = el("div", { class: "pn editable",
+                                     title: I18N.t("proj.clickToRename") }, [
+            el("span", { text: p.name }),
+            p.id === STATE.projectId
+              ? el("span", { class: "chip info", style: "margin-left:6px",
+                             text: I18N.t("proj.current") }) : null
+          ]);
+          nameEl.onclick = function () { renderRow("rename"); };
+
+          row.appendChild(el("div", { class: "pb" }, [
+            nameEl,
             el("div", { class: "pd", text: I18N.t("proj.modified") + " "
               + when.toLocaleString() })
-          ]),
-          el("div", { class: "pa" }, [
+          ]));
+          row.appendChild(el("div", { class: "pa" }, [
             el("button", { class: "btn sm", text: I18N.t("btn.load"),
               onclick: function () {
                 restore(p.payload);
@@ -2610,30 +2676,14 @@
                 closeDrawer();
               } }),
             el("button", { class: "btn sm", text: I18N.t("btn.rename"),
-              onclick: function () {
-                const nm = prompt(I18N.t("proj.name"), p.name);
-                if (nm && nm.trim()) {
-                  Projects.rename(p.id, nm.trim());
-                  if (STATE.projectId === p.id) {
-                    STATE.projectName = nm.trim();
-                    refreshProjectBadge();
-                  }
-                  closeDrawer(); openProjects();
-                }
-              } }),
+                           onclick: function () { renderRow("rename"); } }),
             el("button", { class: "btn sm danger", text: I18N.t("btn.delete"),
-              onclick: function () {
-                if (!confirm(I18N.t("proj.confirmDelete") + "\n\n" + p.name)) return;
-                Projects.remove(p.id);
-                if (STATE.projectId === p.id) {
-                  STATE.projectId = null; STATE.projectName = "";
-                  refreshProjectBadge();
-                }
-                toast(I18N.t("proj.deleted"), "good");
-                closeDrawer(); openProjects();
-              } })
-          ])
-        ]));
+                           onclick: function () { renderRow("delete"); } })
+          ]));
+        }
+
+        renderRow();
+        body.appendChild(row);
       });
 
       body.appendChild(el("div", { class: "section-title", text: "Transfer" }));
