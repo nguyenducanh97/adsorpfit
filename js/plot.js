@@ -111,11 +111,18 @@ const Fig = (function () {
     const grid = dark ? "#1b435a" : s.grid_color;
     const paper = dark ? "#0a2130" : "#ffffff";
 
+    // Hidden series stay in the array with visible:false rather than being
+    // removed. Plotly.react diffs traces by array position, so dropping one
+    // shifts every trace below it: colours jump to the next series and traces
+    // can vanish outright. Keeping the array length and order fixed makes
+    // toggling stable.
     const pdata = traces.map(function (t, i) {
       const colour = t.color || PALETTE[i % PALETTE.length];
+      const vis = t.visible === false ? false : true;
       if (t.kind === "line") {
         return {
           x: t.x, y: t.y, name: t.name, type: "scatter", mode: "lines",
+          visible: vis, showlegend: vis,
           line: { color: colour, width: t.line_width || 2,
                   dash: t.dash || "solid", shape: "spline", smoothing: 0.4 },
           hovertemplate: "%{x:.4g}, %{y:.4g}<extra>" + (t.name || "") + "</extra>"
@@ -125,6 +132,7 @@ const Fig = (function () {
       const open = OPEN_MARKERS.has(sym);
       const tr = {
         x: t.x, y: t.y, name: t.name, type: "scatter", mode: "markers",
+        visible: vis, showlegend: vis,
         marker: {
           symbol: sym, size: (t.marker_size || 5) * 1.7,
           color: open ? "rgba(0,0,0,0)" : (t.marker_fill || colour),
@@ -236,8 +244,12 @@ const Fig = (function () {
 
   function toMatplotlib(traces, style, format) {
     const s = Object.assign({}, DEFAULT_STYLE, style || {});
+    // Colours are resolved against the FULL trace list so a series keeps its
+    // colour whether or not its neighbours are visible; only then are the
+    // hidden ones dropped, since the export has no concept of visibility.
     const out = traces.map(function (t, i) {
       const colour = t.color || PALETTE[i % PALETTE.length];
+      if (t.visible === false) return null;
       if (t.kind === "line") {
         return {
           kind: "line", x: t.x, y: t.y, name: t.name, color: colour,
@@ -262,7 +274,7 @@ const Fig = (function () {
         capsize: t.capsize || 2.5,
         zorder: 3 + i * 0.01
       };
-    });
+    }).filter(Boolean);
     return { traces: out, style: s, format: format || "png", dpi: s.dpi };
   }
 

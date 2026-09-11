@@ -20,9 +20,13 @@
   let XLSX_AVAILABLE = false;        // set once openpyxl is confirmed present
   const CATALOGUE = { isotherm: [], kinetics: [] };
   const STATE = {
-    kinetics: { data: null, fit: null, style: null, traces: [], diffusion: null },
-    isotherm: { data: null, fit: null, style: null, traces: [] },
-    thermo: { datasets: [], result: null, style: null }
+    kinetics: { data: null, fit: null, advice: null, style: null,
+                traceStyle: null, traces: [], diffusion: null },
+    isotherm: { data: null, fit: null, advice: null, style: null,
+                traceStyle: null, traces: [] },
+    thermo: { datasets: [], result: null, style: null, traces: [] },
+    projectId: null,
+    projectName: ""
   };
 
   /* ==================================================================== util */
@@ -94,6 +98,47 @@
 
   function theme() { return document.documentElement.getAttribute("data-theme"); }
 
+  /* ------------------------------------------------------------- equations */
+
+  // Render a LaTeX string with KaTeX. Every model carries a proper `equation`
+  // field in LaTeX; `equation_plain` is only the ASCII fallback used when
+  // KaTeX has not loaded (offline, blocked CDN) or the expression fails to
+  // parse — never as the primary display.
+  function tex(latex, opts) {
+    opts = opts || {};
+    if (typeof katex === "undefined" || !latex) return null;
+    try {
+      return katex.renderToString(latex, {
+        displayMode: opts.display !== false,
+        throwOnError: false,
+        output: "html",
+        strict: false,
+        trust: false,
+        maxSize: 30
+      });
+    } catch (e) {
+      console.warn("KaTeX could not render:", latex, e);
+      return null;
+    }
+  }
+
+  function equationNode(model, opts) {
+    opts = opts || {};
+    const html = tex(model.equation, opts);
+    if (html) {
+      return el("div", { class: "equation" + (opts.cls ? " " + opts.cls : ""),
+                         html: html });
+    }
+    return el("div", { class: "equation fallback" + (opts.cls ? " " + opts.cls : ""),
+                       text: model.equation_plain });
+  }
+
+  function inlineEquation(model) {
+    const html = tex(model.equation, { display: false });
+    return el("span", { class: "mi-eq", html: html || "" }) ||
+           el("span", { class: "mi-eq", text: model.equation_plain });
+  }
+
   /* ==================================================================== boot */
 
   const BOOT_STEPS = [
@@ -136,7 +181,8 @@
       }
 
       bootMsg(3);
-      const files = ["core.py", "isotherms.py", "kinetics.py", "thermo.py", "bridge.py"];
+      const files = ["core.py", "isotherms.py", "kinetics.py", "thermo.py",
+                     "advisor.py", "bridge.py"];
       const sources = await Promise.all(files.map(function (f) {
         return fetch("py/" + f + "?v=" + Date.now()).then(function (r) {
           if (!r.ok) throw new Error("could not load py/" + f + " (" + r.status + ")");
@@ -210,7 +256,7 @@
           cb,
           el("span", { class: "mi-body" }, [
             el("span", { class: "mi-name", text: m.name }),
-            el("span", { class: "mi-eq", text: m.equation_plain })
+            inlineEquation(m)
           ]),
           el("button", {
             class: "mi-info", type: "button", title: "About this model",
@@ -228,7 +274,7 @@
       if (e.target === back) back.remove();
     } });
     const body = el("div", { class: "modal-body" }, [
-      el("div", { class: "equation", text: m.equation_plain }),
+      equationNode(m),
       el("p", { class: "tiny", style: "margin-top:-6px",
                 text: m.citation }),
       el("div", { class: "section-title", text: "Parameters" }),
@@ -302,6 +348,26 @@
 
   /* ================================================================ fitting */
 
+  // Experimental context shared by the fitter and the advisor, so both judge
+  // a model against exactly the same conditions.
+  function buildCtx(cat, data) {
+    const pref = cat === "kinetics" ? "kin" : "iso";
+    const ctx = { T: Number($("#" + pref + "-T").value) || 298.15 };
+    if (cat === "kinetics") {
+      ctx.C0 = Number($("#kin-C0").value) || null;
+      ctx.dose = Number($("#kin-dose").value) || null;
+      ctx.particle_radius = Number($("#kin-radius").value) || null;
+    } else {
+      const mw = Number($("#iso-MW").value);
+      if (mw) ctx.MW = mw;
+      const cs = Number($("#iso-Cs").value);
+      if (cs) ctx.Cs = cs;
+      ctx.dose = Number($("#iso-dose").value) || null;
+      if (data && data.C0col) ctx.C0_list = data.C0col;
+    }
+    return ctx;
+  }
+
   async function runFit(cat) {
     const data = readData(cat);
     if (!data) return;
@@ -311,18 +377,7 @@
       .map(function (c) { return c.value; });
     if (!models.length) { toast("Select at least one model.", "bad"); return; }
 
-    const ctx = { T: Number($("#" + pref + "-T").value) || 298.15 };
-    if (cat === "kinetics") {
-      ctx.C0 = Number($("#kin-C0").value) || null;
-      ctx.dose = Number($("#kin-dose").value) || null;
-    } else {
-      const mw = Number($("#iso-MW").value);
-      if (mw) ctx.MW = mw;
-      const cs = Number($("#iso-Cs").value);
-      ctx.Cs = cs || 1000.0;
-      ctx.dose = Number($("#iso-dose").value) || null;
-      if (data.C0col) ctx.C0_list = data.C0col;
-    }
+    const ctx = buildCtx(cat, data);
 
     const btn = $("#" + pref + "-run");
     const old = btn.innerHTML;
@@ -355,6 +410,150 @@
       btn.disabled = false;
       btn.innerHTML = old;
     }
+  }
+
+  /* =============================================================== advisor */
+
+  async function runAdvisor(cat) {
+    const data = readData(cat);
+    if (!data) return;
+    const pref = cat === "kinetics" ? "kin" : "iso";
+    const btn = document.querySelector('[data-advise="' + cat + '"]');
+    const old = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-inline"></span>';
+    await new Promise(function (r) { setTimeout(r, 30); });
+    try {
+      const ctx = buildCtx(cat, data);
+      const res = call("advise", {
+        category: cat === "kinetics" ? "kinetics" : "isotherm",
+        x: data.x, y: data.y, ctx: ctx
+      });
+      STATE[cat].advice = res;
+      renderAdvice(cat);
+    } catch (e) {
+      toast("Analysis failed: " + e.message, "bad", 7000);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = old;
+    }
+  }
+
+  function renderAdvice(cat) {
+    const host = $(cat === "kinetics" ? "#kin-advice" : "#iso-advice");
+    const res = STATE[cat].advice;
+    host.innerHTML = "";
+    if (!res) {
+      host.appendChild(el("p", { class: "tiny", style: "margin:0",
+                                 text: I18N.t("adv.none") }));
+      return;
+    }
+
+    host.appendChild(el("p", { class: "tiny", style: "margin:0 0 12px",
+                               text: I18N.t("adv.intro") }));
+
+    res.summary.forEach(function (s) {
+      host.appendChild(el("div", { class: "callout info" }, [
+        el("span", { class: "ci", text: "▸" }),
+        el("span", { html: md(s) })
+      ]));
+    });
+
+    const groups = { recommend: [], usable: [], avoid: [] };
+    res.models.forEach(function (m) { groups[m.verdict].push(m); });
+
+    ["recommend", "usable", "avoid"].forEach(function (v) {
+      const list = groups[v];
+      if (!list.length) return;
+      host.appendChild(el("div", { class: "advice-group" }, [
+        el("div", { class: "advice-head " + v }, [
+          el("span", { class: "dot" }),
+          el("span", { text: I18N.t("adv." + v) + " (" + list.length + ")" }),
+          el("span", { class: "line" })
+        ])
+      ].concat(list.map(function (m) {
+        const cb = el("input", { type: "checkbox", "data-advice-pick": m.key });
+        cb.checked = v === "recommend";
+        cb.onchange = function () {
+          const target = $$('#' + (cat === "kinetics" ? "kin" : "iso") +
+            '-models input[type=checkbox]').find(function (c) {
+            return c.value === m.key;
+          });
+          if (target) target.checked = cb.checked;
+        };
+        return el("div", { class: "advice-item " + v }, [
+          el("div", { class: "ai-top" }, [
+            el("span", { class: "ai-name", text: m.name }),
+            el("span", { class: "chip", text: m.n_params + "p" }),
+            m.R2 !== null && m.R2 !== undefined
+              ? el("span", { class: "chip", text: "R² " + fmt(m.R2, 4) }) : null,
+            m.delta !== null && m.delta !== undefined
+              ? el("span", { class: "chip", text: "Δ " + fmt(m.delta, 3) }) : null,
+            el("label", { class: "pick" }, [cb, "select"])
+          ]),
+          el("ul", { class: "ai-why" }, m.reasons.slice(0, 3).map(function (r) {
+            return el("li", { html: md(r) });
+          }))
+        ]);
+      }))));
+    });
+
+    host.appendChild(el("div", { class: "btn-row", style: "margin-top:12px" }, [
+      el("button", { class: "btn primary sm", text: I18N.t("btn.applyAdvice"),
+        onclick: function () { applyAdvice(cat); } }),
+      el("button", { class: "btn sm", text: I18N.t("btn.fit"),
+        onclick: function () { applyAdvice(cat); runFit(cat); } })
+    ]));
+  }
+
+  function applyAdvice(cat) {
+    const res = STATE[cat].advice;
+    if (!res) return;
+    const pref = cat === "kinetics" ? "#kin-models" : "#iso-models";
+    const wanted = {};
+    res.models.forEach(function (m) {
+      if (m.verdict === "recommend") wanted[m.key] = true;
+    });
+    $$(pref + " input[type=checkbox]").forEach(function (c) {
+      c.checked = !!wanted[c.value];
+    });
+    $$('[data-advice-pick]').forEach(function (c) {
+      c.checked = !!wanted[c.getAttribute("data-advice-pick")];
+    });
+    const n = Object.keys(wanted).length;
+    toast(n + " recommended model(s) selected.", "good");
+  }
+
+  /* ================================================================ issues */
+
+  const ISSUE_ICON = { block: "⛔", warn: "⚠", info: "ℹ" };
+  const ISSUE_CLASS = { block: "bad", warn: "warn", info: "info" };
+
+  function issueNode(i, modelName) {
+    return el("div", { class: "callout " + ISSUE_CLASS[i.level] + " issue " + i.level }, [
+      el("span", { class: "ci", text: ISSUE_ICON[i.level] }),
+      el("span", {}, [
+        i.level === "block"
+          ? el("span", { class: "badge-block", text: I18N.t("issue.block") })
+          : (i.level === "warn"
+             ? el("span", { class: "badge-warn", text: I18N.t("issue.warn") })
+             : null),
+        el("span", { html: " " + (modelName ? "<strong>" + modelName + ":</strong> " : "")
+                             + md(i.text) })
+      ])
+    ]);
+  }
+
+  function collectIssues(res) {
+    const out = [];
+    res.results.forEach(function (m) {
+      (m.issues || []).forEach(function (i) {
+        out.push({ model: m.model_name, issue: i });
+      });
+    });
+    const rank = { block: 0, warn: 1, info: 2 };
+    out.sort(function (a, b) { return rank[a.issue.level] - rank[b.issue.level]; });
+    return out;
   }
 
   /* ============================================================== rendering */
@@ -445,9 +644,18 @@
         el("th", { text: "support" })
       ])]),
       el("tbody", {}, res.ranking.map(function (r) {
-        return el("tr", { class: r.rank === 1 ? "best" : "" }, [
+        const m = res.results.find(function (q) { return q.model_key === r.model_key; });
+        const blocked = m && (m.issues || []).some(function (i) {
+          return i.level === "block";
+        });
+        return el("tr", { class: blocked ? "" : (r.rank === 1 ? "best" : "") }, [
           el("td", { class: "num", text: r.rank }),
-          el("td", { text: r.model_name }),
+          el("td", {}, [
+            el("span", { text: r.model_name }),
+            blocked ? el("span", { class: "badge-block",
+                                   style: "margin-left:7px",
+                                   text: I18N.t("issue.block") }) : null
+          ]),
           el("td", { class: "num", text: r.n_params }),
           el("td", { class: "num", text: fmt(r.value, 5) }),
           el("td", { class: "num", text: fmt(r.delta, 3) }),
@@ -468,6 +676,27 @@
       "is the best approximating one <em>among those you fitted</em>. Models within " +
       "Δ &lt; 2 of the leader are not statistically distinguishable from it." }));
 
+    // Domain and validity findings come first: a model that predicts
+    // impossible values is a harder problem than a wide confidence interval,
+    // and burying it under the statistics is how it gets published.
+    const issues = collectIssues(res);
+    const blocking = issues.filter(function (r) { return r.issue.level === "block"; });
+    if (blocking.length) {
+      wrap.appendChild(el("div", { class: "callout bad", style: "font-weight:600" }, [
+        el("span", { class: "ci", text: "⛔" }),
+        el("span", { html: blocking.length + " of the models you fitted are being "
+          + "applied outside their own domain of validity. Their parameters should "
+          + "not be reported, regardless of R²." })
+      ]));
+    }
+    if (issues.length) {
+      wrap.appendChild(el("div", { class: "section-title",
+                                   text: I18N.t("issue.heading") }));
+      issues.forEach(function (r) {
+        wrap.appendChild(issueNode(r.issue, r.model));
+      });
+    }
+
     const allWarn = [];
     res.results.forEach(function (m) {
       (m.warnings || []).forEach(function (w) {
@@ -475,7 +704,8 @@
       });
     });
     if (allWarn.length) {
-      wrap.appendChild(el("div", { class: "section-title", text: "Diagnostics" }));
+      wrap.appendChild(el("div", { class: "section-title",
+                                   text: "Parameter diagnostics" }));
       allWarn.forEach(function (w) {
         wrap.appendChild(el("div", { class: "callout warn" }, [
           el("span", { class: "ci", text: "⚠" }),
@@ -621,30 +851,32 @@
     const ts = st.traceStyle || {};
     const out = [];
 
+    // Every series is always emitted, in a fixed order, with `visible` marking
+    // whether it is shown. Filtering the array here instead would shift the
+    // remaining traces' positions and make Plotly reassign their colours.
     if (mode === "fit") {
       const dt = ts.__data__ || {};
-      if (dt.show !== false) {
-        out.push({
-          kind: "scatter", x: d.x, y: d.y, name: "Experimental",
-          color: dt.color, symbol: dt.symbol, marker_size: dt.marker_size,
-          yerr: d.yerr && d.yerr.every(function (v) { return v !== null; }) ? d.yerr : null
-        });
-      }
+      out.push({
+        kind: "scatter", x: d.x, y: d.y, name: "Experimental",
+        color: dt.color, symbol: dt.symbol, marker_size: dt.marker_size,
+        visible: dt.show !== false,
+        yerr: d.yerr && d.yerr.every(function (v) { return v !== null; }) ? d.yerr : null
+      });
       seriesFor(cat).forEach(function (m) {
         const s = ts[m.model_key] || {};
-        if (s.show === false) return;
         out.push({
           kind: "line", x: m.curve.x, y: m.curve.y, name: m.model_name,
-          color: s.color, dash: s.dash, line_width: s.line_width
+          color: s.color, dash: s.dash, line_width: s.line_width,
+          visible: s.show !== false
         });
       });
     } else if (mode === "residual") {
       seriesFor(cat).forEach(function (m) {
         const s = ts[m.model_key] || {};
-        if (s.show === false) return;
         out.push({
           kind: "scatter", x: d.x, y: m.residuals, name: m.model_name,
-          color: s.color, symbol: "circle", marker_size: 5
+          color: s.color, symbol: s.symbol || "circle", marker_size: 5,
+          visible: s.show !== false
         });
       });
       out.push({ kind: "line", x: [Math.min.apply(null, d.x), Math.max.apply(null, d.x)],
@@ -654,10 +886,10 @@
       const all = [];
       seriesFor(cat).forEach(function (m) {
         const s = ts[m.model_key] || {};
-        if (s.show === false) return;
         out.push({ kind: "scatter", x: d.y, y: m.y_cal, name: m.model_name,
-                   color: s.color, symbol: s.symbol || "circle", marker_size: 5 });
-        all.push.apply(all, m.y_cal.concat(d.y));
+                   color: s.color, symbol: s.symbol || "circle", marker_size: 5,
+                   visible: s.show !== false });
+        if (s.show !== false) all.push.apply(all, m.y_cal.concat(d.y));
       });
       if (all.length) {
         const lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
@@ -726,7 +958,11 @@
         return;
       }
 
-      body.appendChild(el("div", { class: "equation", text: m.equation_plain }));
+      body.appendChild(equationNode(m));
+
+      (m.issues || []).forEach(function (i) {
+        body.appendChild(issueNode(i, null));
+      });
 
       body.appendChild(el("div", { class: "table-wrap" }, [
         el("table", { class: "data" }, [
@@ -825,7 +1061,15 @@
           el("span", { class: "chip", text: "R² " + fmt(m.stats.R2, 4) })
         ])
       ]));
-      card.appendChild(el("div", { class: "rb" }, [
+      const blockers = (m.issues || []).filter(function (i) {
+        return i.level === "block";
+      });
+      card.appendChild(el("div", { class: "rb" },
+        blockers.map(function (i) { return issueNode(i, null); }).concat([
+        blockers.length ? el("p", { class: "tiny", style: "margin:0 0 12px",
+          text: "The interpretation below is generated from parameters that fall "
+              + "outside this model's valid range. It is shown for completeness "
+              + "only — do not quote it." }) : null,
         el("ul", { class: "interp" }, m.interpretation.map(function (s) {
           return el("li", { html: md(s) });
         })),
@@ -833,7 +1077,7 @@
         el("ul", { class: "interp" }, m.assumptions.map(function (a) {
           return el("li", { html: md(a) });
         }))
-      ]));
+      ])));
       wrap.appendChild(card);
     });
     return wrap;
@@ -1600,6 +1844,101 @@
     host.innerHTML = "";
     const vh = res.vant_hoff;
 
+    // Figures are constructed synchronously so the styling panel can be
+    // built from them in the same pass; only the Plotly calls are deferred,
+    // because those need the target divs to exist in the DOM first.
+  // Build every thermodynamic figure up front and keep each one's traces
+  // and style together, so the styling panel and the exporter can address
+  // them by key. Styles survive a re-run, so a figure you have already
+  // tuned is not reset when you change a fitting option.
+  const prev = STATE.thermo.figures || {};
+  const figs = {};
+
+  const x0 = Math.min.apply(null, vh.invT), x1 = Math.max.apply(null, vh.invT);
+  figs.vanthoff = {
+    label: "van't Hoff — ln K° vs 1/T",
+    traces: [
+      { kind: "scatter", x: vh.invT, y: vh.lnK, name: "experimental",
+        color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
+      { kind: "line", x: [x0, x1],
+        y: [vh.slope * x0 + vh.intercept, vh.slope * x1 + vh.intercept],
+        name: "van't Hoff fit (R² = " + fmt(vh.R2, 4) + ")",
+        color: Fig.PALETTE[1], dash: "dash", line_width: 1.6 }
+    ],
+    style: (prev.vanthoff && prev.vanthoff.style) || Fig.newStyle({
+      x_label: "1/$T$ (K$^{-1}$)",
+      y_label: "ln $K^{\\circ}$",
+      legend_loc: "upper right"
+    })
+  };
+
+  figs.gibbs = {
+    label: "Gibbs energy — ΔG° vs T",
+    traces: [
+      { kind: "scatter", x: vh.T, y: vh.dG_direct_kJ_mol,
+        name: "ΔG° from K°", color: Fig.PALETTE[0],
+        symbol: "circle", marker_size: 6 },
+      { kind: "line", x: vh.T, y: vh.dG_from_fit_kJ_mol,
+        name: "ΔH° − TΔS°",
+        color: Fig.PALETTE[1], dash: "dash", line_width: 1.6 }
+    ],
+    style: (prev.gibbs && prev.gibbs.style) || Fig.newStyle({
+      x_label: "$T$ (K)",
+      y_label: "$\\Delta G^{\\circ}$ (kJ mol$^{-1}$)",
+      legend_loc: "upper right"
+    })
+  };
+
+  if (res.isosteric) {
+    const rows = res.isosteric.rows.filter(function (r) {
+      return r.dH_iso_kJ_mol !== null;
+    });
+    if (rows.length) {
+      figs.isosteric = {
+        label: "Isosteric heat — ΔH_iso vs loading",
+        traces: [{
+          kind: "scatter", x: rows.map(function (r) { return r.q; }),
+          y: rows.map(function (r) { return r.dH_iso_kJ_mol; }),
+          yerr: rows.map(function (r) { return r.se_kJ_mol; }),
+          name: "ΔH_iso", color: Fig.PALETTE[2],
+          symbol: "square", marker_size: 6
+        }],
+        style: (prev.isosteric && prev.isosteric.style) || Fig.newStyle({
+          x_label: "$q_e$ (mg g$^{-1}$)",
+          y_label: "$\\Delta H_{iso}$ (kJ mol$^{-1}$)",
+          legend: false
+        })
+      };
+    }
+  }
+
+  if (res.arrhenius && !res.arrhenius.error) {
+    const a = res.arrhenius;
+    const ax0 = Math.min.apply(null, a.invT), ax1 = Math.max.apply(null, a.invT);
+    const slope = -a.Ea_kJ_mol * 1000 / 8.314462618;
+    const icept = Math.log(a.A);
+    figs.arrhenius = {
+      label: "Arrhenius — ln k vs 1/T",
+      traces: [
+        { kind: "scatter", x: a.invT, y: a.lnk, name: "experimental",
+          color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
+        { kind: "line", x: [ax0, ax1],
+          y: [slope * ax0 + icept, slope * ax1 + icept],
+          name: "Arrhenius fit", color: Fig.PALETTE[1], dash: "dash",
+          line_width: 1.6 }
+      ],
+      style: (prev.arrhenius && prev.arrhenius.style) || Fig.newStyle({
+        x_label: "1/$T$ (K$^{-1}$)", y_label: "ln $k$",
+        legend_loc: "upper right"
+      })
+    };
+  }
+
+  STATE.thermo.figures = figs;
+  STATE.thermo.traces = figs.vanthoff.traces;
+  STATE.thermo.style = figs.vanthoff.style;
+
+
     if (vh.error) {
       host.appendChild(el("div", { class: "callout bad" }, [
         el("span", { class: "ci", text: "✕" }), el("span", { text: vh.error })
@@ -1730,73 +2069,54 @@
       body.appendChild(el("div", { id: "arr-plot" }));
     }
 
-    body.appendChild(el("div", { class: "section-title", text: "Export" }));
+    body.appendChild(el("div", { class: "section-title",
+                                 text: "Figure styling and export" }));
+    body.appendChild(buildThermoFigurePanel());
+
+    body.appendChild(el("div", { class: "section-title", text: "Data export" }));
     body.appendChild(el("div", { class: "btn-row" }, [
-      el("button", { class: "btn primary", onclick: function () {
-        exportThermoFigure("png");
-      } }, ["Download van't Hoff figure"]),
       el("button", { class: "btn", onclick: function () {
         const rows = vh.T.map(function (T, i) {
           return { T: T, K0: vh.K0[i], lnK: vh.lnK[i],
-                   invT: vh.invT[i], dG: vh.dG_direct_kJ_mol[i] };
+                   invT: vh.invT[i], dG: vh.dG_direct_kJ_mol[i],
+                   dGfit: vh.dG_from_fit_kJ_mol[i] };
         });
         const r = call("export_table", {
           rows: rows, format: "csv",
           columns: [{ key: "T", label: "T (K)" }, { key: "invT", label: "1/T (1/K)" },
                     { key: "K0", label: "K0" }, { key: "lnK", label: "ln K0" },
-                    { key: "dG", label: "dG (kJ/mol)" }],
+                    { key: "dG", label: "dG from K (kJ/mol)" },
+                    { key: "dGfit", label: "dG from dH-TdS (kJ/mol)" }],
           caption: "van't Hoff data"
         });
         download(new Blob([r.text], { type: "text/csv" }), "adsorpfit-vanthoff.csv");
-      } }, ["Download data (CSV)"])
+      } }, ["Download data (CSV)"]),
+      el("button", { class: "btn", onclick: function () {
+        download(new Blob([JSON.stringify(STATE.thermo.result, null, 2)],
+                          { type: "application/json" }),
+                 "adsorpfit-thermo.json");
+      } }, ["Download full result (JSON)"])
     ]));
 
     panel.appendChild(body);
     host.appendChild(panel);
 
     setTimeout(function () {
-      const x0 = Math.min.apply(null, vh.invT), x1 = Math.max.apply(null, vh.invT);
-      STATE.thermo.traces = [
-        { kind: "scatter", x: vh.invT, y: vh.lnK, name: "experimental",
-          color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
-        { kind: "line", x: [x0, x1],
-          y: [vh.slope * x0 + vh.intercept, vh.slope * x1 + vh.intercept],
-          name: "van't Hoff fit (R² = " + fmt(vh.R2, 4) + ")",
-          color: Fig.PALETTE[1], dash: "dash", line_width: 1.6 }
-      ];
-      STATE.thermo.style = Fig.newStyle({
-        x_label: "1/$T$ (K$^{-1}$)", y_label: "ln $K^{\\circ}$",
-        legend_loc: "upper right"
-      });
-      Fig.draw("vh-plot", STATE.thermo.traces, STATE.thermo.style, theme());
 
-      if (res.isosteric) {
-        const rows = res.isosteric.rows.filter(function (r) {
-          return r.dH_iso_kJ_mol !== null;
-        });
-        Fig.draw("iso-heat-plot", [{
-          kind: "scatter", x: rows.map(function (r) { return r.q; }),
-          y: rows.map(function (r) { return r.dH_iso_kJ_mol; }),
-          yerr: rows.map(function (r) { return r.se_kJ_mol; }),
-          name: "ΔH_iso", color: Fig.PALETTE[2], symbol: "square", marker_size: 6
-        }], Fig.newStyle({ x_label: "$q_e$ (mg g$^{-1}$)",
-                           y_label: "$\\Delta H_{iso}$ (kJ mol$^{-1}$)",
-                           legend: false, height_cm: 6 }), theme());
+      Fig.draw("vh-plot", figs.vanthoff.traces, figs.vanthoff.style, theme());
+      if (figs.isosteric) {
+        Fig.draw("iso-heat-plot", figs.isosteric.traces,
+                 Object.assign({}, figs.isosteric.style, { height_cm: 6 }), theme());
       }
-      if (res.arrhenius && !res.arrhenius.error) {
-        const a = res.arrhenius;
-        const ax0 = Math.min.apply(null, a.invT), ax1 = Math.max.apply(null, a.invT);
-        const slope = -a.Ea_kJ_mol * 1000 / 8.314462618;
-        const icept = Math.log(a.A);
-        Fig.draw("arr-plot", [
-          { kind: "scatter", x: a.invT, y: a.lnk, name: "experimental",
-            color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
-          { kind: "line", x: [ax0, ax1],
-            y: [slope * ax0 + icept, slope * ax1 + icept],
-            name: "Arrhenius fit", color: Fig.PALETTE[1], dash: "dash",
-            line_width: 1.6 }
-        ], Fig.newStyle({ x_label: "1/$T$ (K$^{-1}$)", y_label: "ln $k$",
-                          legend_loc: "upper right", height_cm: 6 }), theme());
+      if (figs.arrhenius) {
+        Fig.draw("arr-plot", figs.arrhenius.traces,
+                 Object.assign({}, figs.arrhenius.style, { height_cm: 6 }), theme());
+      }
+
+      if ($("#th-fig-preview")) {
+        const pick = $("#th-figpick");
+        const k = (pick && pick.value) || "vanthoff";
+        if (figs[k]) Fig.draw("th-fig-preview", figs[k].traces, figs[k].style, theme());
       }
     }, 40);
   }
@@ -1812,14 +2132,421 @@
     ]);
   }
 
-  function exportThermoFigure(format) {
+  // The thermodynamic figures get the same treatment as the kinetics and
+  // isotherm ones: a full style panel, a live preview, and every export
+  // format. A figure selector switches which of the three is being edited.
+  function buildThermoFigurePanel() {
+    const figs = STATE.thermo.figures || {};
+    const keys = Object.keys(figs);
+    if (!keys.length) return el("p", { class: "tiny", text: "No figure available." });
+
+    const sel = el("select", { id: "th-figpick" }, keys.map(function (k) {
+      return el("option", { value: k, text: figs[k].label });
+    }));
+    const styleHost = el("div", { class: "style-stack", id: "th-stylectl" });
+    const preview = el("div", { id: "th-fig-preview" });
+
+    function refresh() {
+      const k = sel.value;
+      const f = STATE.thermo.figures[k];
+      Fig.draw("th-fig-preview", f.traces, f.style, theme());
+    }
+    sel.onchange = function () {
+      const f = STATE.thermo.figures[sel.value];
+      Fig.buildControls(styleHost, f.style, refresh);
+      refresh();
+    };
+
+    const fmtSel = el("select", { id: "th-imgfmt" },
+      IMAGE_FORMATS.map(function (f) {
+        return el("option", { value: f[0], text: f[1] });
+      }));
+    const dpiSel = el("select", { id: "th-imgdpi" },
+      [150, 300, 600, 900, 1200].map(function (d) {
+        const o = el("option", { value: d, text: d + " dpi" });
+        if (d === 600) o.selected = true;
+        return o;
+      }));
+
+    const shell = el("div", { class: "figure-shell" }, [
+      el("div", {}, [
+        el("div", { class: "btn-row", style: "margin-bottom:10px" }, [
+          el("span", { class: "mini-label", style: "margin:0", text: "Figure" }),
+          sel
+        ]),
+        preview,
+        el("div", { class: "row c2", style: "margin-top:12px" }, [
+          el("label", { class: "field" }, [
+            el("span", { class: "lbl", text: I18N.t("lbl.format") }), fmtSel]),
+          el("label", { class: "field" }, [
+            el("span", { class: "lbl", text: I18N.t("lbl.resolution") }), dpiSel])
+        ]),
+        el("div", { class: "btn-row" }, [
+          el("button", { class: "btn primary", text: I18N.t("btn.download"),
+            onclick: function () {
+              exportThermoFigure(sel.value, fmtSel.value, Number(dpiSel.value));
+            } }),
+          el("button", { class: "btn", text: I18N.t("btn.downloadAll"),
+            onclick: async function () {
+              for (const f of IMAGE_FORMATS) {
+                if (f[0] === "bmp") continue;
+                await exportThermoFigure(sel.value, f[0], Number(dpiSel.value));
+                await new Promise(function (r) { setTimeout(r, 350); });
+              }
+            } })
+        ])
+      ]),
+      el("div", {}, [styleHost])
+    ]);
+
+    setTimeout(function () {
+      const f = STATE.thermo.figures[sel.value];
+      Fig.buildControls(styleHost, f.style, refresh);
+      refresh();
+    }, 20);
+    return shell;
+  }
+
+  async function exportThermoFigure(key, format, dpi) {
     try {
-      const payload = Fig.toMatplotlib(STATE.thermo.traces,
-        STATE.thermo.style, format);
+      const f = STATE.thermo.figures[key];
+      if (!f) return;
+      const style = Object.assign({}, f.style, { dpi: dpi || 600 });
+      const payload = Fig.toMatplotlib(f.traces, style, format || "png");
+      payload.dpi = dpi || 600;
+      toast(I18N.t("msg.rendering", { fmt: (format || "png").toUpperCase(),
+                                      dpi: dpi || 600 }));
       const r = call("render_figure", payload);
-      download(b64ToBlob(r.data, r.mime), "adsorpfit-vanthoff." + r.format);
-      toast("Downloaded.", "good");
-    } catch (e) { toast("Export failed: " + e.message, "bad"); }
+      download(b64ToBlob(r.data, r.mime), "adsorpfit-" + key + "." + r.format);
+      toast(I18N.t("msg.downloaded"), "good");
+    } catch (e) { toast("Export failed: " + e.message, "bad", 7000); }
+  }
+
+  /* ======================================================== settings drawer */
+
+  function openDrawer(title, buildBody) {
+    closeDrawer();
+    const back = el("div", { class: "drawer-back", onclick: closeDrawer });
+    const body = el("div", { class: "drawer-body" });
+    const panel = el("div", { class: "drawer", role: "dialog", "aria-modal": "true" }, [
+      el("div", { class: "drawer-head" }, [
+        el("h3", { text: title }),
+        el("button", { class: "icon-btn", style: "margin-left:auto",
+                       onclick: closeDrawer, html: "&times;",
+                       "aria-label": I18N.t("btn.close") })
+      ]),
+      body
+    ]);
+    document.body.appendChild(back);
+    document.body.appendChild(panel);
+    buildBody(body);
+    document.addEventListener("keydown", escClose);
+  }
+
+  function escClose(e) { if (e.key === "Escape") closeDrawer(); }
+
+  function closeDrawer() {
+    $$(".drawer-back, .drawer").forEach(function (n) { n.remove(); });
+    document.removeEventListener("keydown", escClose);
+  }
+
+  function segmented(labelKey, prefKey, options) {
+    const wrap = el("div", {}, [
+      el("label", { class: "mini-label", text: I18N.t(labelKey) })
+    ]);
+    const seg = el("div", { class: "seg" });
+    options.forEach(function (o) {
+      const b = el("button", { type: "button", text: I18N.t(o[1]) });
+      b.setAttribute("aria-pressed", Prefs.get(prefKey) === o[0] ? "true" : "false");
+      b.onclick = function () {
+        Prefs.set(prefKey, o[0]);
+        $$("button", seg).forEach(function (x) {
+          x.setAttribute("aria-pressed", x === b ? "true" : "false");
+        });
+        redrawAllFigures();
+      };
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg);
+    return wrap;
+  }
+
+  function openSettings() {
+    openDrawer(I18N.t("set.title"), function (body) {
+      body.appendChild(segmented("set.theme", "theme", [
+        ["light", "set.themeLight"], ["dark", "set.themeDark"],
+        ["auto", "set.themeAuto"]
+      ]));
+      body.appendChild(segmented("set.motion", "motion", [
+        ["full", "set.motionFull"], ["calm", "set.motionCalm"],
+        ["off", "set.motionOff"]
+      ]));
+      body.appendChild(segmented("set.layout", "layout", [
+        ["side", "set.layoutSide"], ["right", "set.layoutRight"],
+        ["stack", "set.layoutStack"]
+      ]));
+      body.appendChild(segmented("set.density", "density", [
+        ["comfy", "set.densityComfy"], ["compact", "set.densityCompact"]
+      ]));
+
+      body.appendChild(el("div", { class: "section-title",
+                                   text: I18N.t("set.language") }));
+      const seg = el("div", { class: "seg" });
+      I18N.languages.forEach(function (l) {
+        const b = el("button", { type: "button", text: l[1] });
+        b.setAttribute("aria-pressed", I18N.get() === l[0] ? "true" : "false");
+        b.onclick = function () {
+          I18N.set(l[0]);
+          closeDrawer();
+          openSettings();
+        };
+        seg.appendChild(b);
+      });
+      body.appendChild(seg);
+      body.appendChild(el("p", { class: "tiny", html:
+        "The interface, the guide and the model descriptions are translated. "
+        + "The automatically written interpretation paragraphs are still "
+        + "generated in English." }));
+
+      const u = Projects.usage();
+      body.appendChild(el("div", { class: "section-title", text: "Storage" }));
+      body.appendChild(el("p", { class: "tiny", html:
+        u.count + " project(s) saved, using " + (u.bytes / 1024).toFixed(1)
+        + " KB of this browser's local storage. Preferences and projects live "
+        + "on this device only — nothing is sent to a server, so they will not "
+        + "follow you to another computer unless you export them to a file." }));
+    });
+  }
+
+  /* ======================================================== projects drawer */
+
+  function snapshot() {
+    // Everything needed to restore a working session. Raw text is stored
+    // rather than parsed arrays so the user sees exactly what they typed.
+    return {
+      version: Projects.VERSION,
+      savedAt: new Date().toISOString(),
+      kinetics: {
+        data: $("#kin-data").value,
+        tunit: $("#kin-tunit").value, qunit: $("#kin-qunit").value,
+        T: $("#kin-T").value, C0: $("#kin-C0").value,
+        dose: $("#kin-dose").value, radius: $("#kin-radius").value,
+        weights: $("#kin-weights").value, criterion: $("#kin-criterion").value,
+        linear: $("#kin-linear").checked,
+        models: $$("#kin-models input:checked").map(function (c) { return c.value; }),
+        style: STATE.kinetics.style, traceStyle: STATE.kinetics.traceStyle
+      },
+      isotherm: {
+        data: $("#iso-data").value,
+        cunit: $("#iso-cunit").value, qunit: $("#iso-qunit").value,
+        T: $("#iso-T").value, MW: $("#iso-MW").value,
+        Cs: $("#iso-Cs").value, dose: $("#iso-dose").value,
+        weights: $("#iso-weights").value, criterion: $("#iso-criterion").value,
+        linear: $("#iso-linear").checked,
+        models: $$("#iso-models input:checked").map(function (c) { return c.value; }),
+        style: STATE.isotherm.style, traceStyle: STATE.isotherm.traceStyle
+      },
+      thermo: {
+        model: $("#th-model").value, route: $("#th-route").value,
+        MW: $("#th-MW").value,
+        nonlinear: $("#th-nonlinear").checked,
+        isosteric: $("#th-isosteric").checked,
+        arrhenius: $("#th-arrhenius").checked,
+        arrData: $("#th-arr-data").value,
+        datasets: $$("#th-datasets > .panel").map(function (b) {
+          return { T: $(".th-T", b).value, data: $(".th-data", b).value };
+        })
+      }
+    };
+  }
+
+  function restore(p) {
+    if (!p) return;
+    function setv(sel, v) { const n = $(sel); if (n && v !== undefined && v !== null) n.value = v; }
+    function setc(sel, v) { const n = $(sel); if (n && v !== undefined) n.checked = !!v; }
+
+    const k = p.kinetics || {};
+    setv("#kin-data", k.data); setv("#kin-tunit", k.tunit); setv("#kin-qunit", k.qunit);
+    setv("#kin-T", k.T); setv("#kin-C0", k.C0); setv("#kin-dose", k.dose);
+    setv("#kin-radius", k.radius); setv("#kin-weights", k.weights);
+    setv("#kin-criterion", k.criterion); setc("#kin-linear", k.linear);
+    if (k.models) $$("#kin-models input").forEach(function (c) {
+      c.checked = k.models.indexOf(c.value) >= 0;
+    });
+    STATE.kinetics.style = k.style || null;
+    STATE.kinetics.traceStyle = k.traceStyle || null;
+
+    const i = p.isotherm || {};
+    setv("#iso-data", i.data); setv("#iso-cunit", i.cunit); setv("#iso-qunit", i.qunit);
+    setv("#iso-T", i.T); setv("#iso-MW", i.MW); setv("#iso-Cs", i.Cs);
+    setv("#iso-dose", i.dose); setv("#iso-weights", i.weights);
+    setv("#iso-criterion", i.criterion); setc("#iso-linear", i.linear);
+    if (i.models) $$("#iso-models input").forEach(function (c) {
+      c.checked = i.models.indexOf(c.value) >= 0;
+    });
+    STATE.isotherm.style = i.style || null;
+    STATE.isotherm.traceStyle = i.traceStyle || null;
+
+    const th = p.thermo || {};
+    setv("#th-model", th.model); setv("#th-route", th.route); setv("#th-MW", th.MW);
+    setc("#th-nonlinear", th.nonlinear); setc("#th-isosteric", th.isosteric);
+    setc("#th-arrhenius", th.arrhenius); setv("#th-arr-data", th.arrData);
+    $("#th-arr-box").classList.toggle("hidden", !th.arrhenius);
+    if (th.datasets && th.datasets.length) {
+      $("#th-datasets").innerHTML = "";
+      th.datasets.forEach(function (d) { addThermoDataset(Number(d.T), d.data); });
+    }
+    const rs = $("#th-route");
+    if (rs && rs.onchange) rs.onchange();
+
+    ["kinetics", "isotherm"].forEach(function (c) {
+      STATE[c].fit = null; STATE[c].advice = null;
+      $(c === "kinetics" ? "#kin-results" : "#iso-results").innerHTML = "";
+      renderAdvice(c);
+      if ($(c === "kinetics" ? "#kin-data" : "#iso-data").value.trim()) readData(c);
+    });
+    STATE.thermo.result = null;
+    $("#th-results").innerHTML = "";
+  }
+
+  function openProjects() {
+    openDrawer(I18N.t("proj.title"), function (body) {
+      const nameInput = el("input", { type: "text",
+        placeholder: I18N.t("proj.name"),
+        value: STATE.projectName || "" });
+      body.appendChild(el("label", { class: "field" }, [
+        el("span", { class: "lbl", text: I18N.t("proj.name") }), nameInput
+      ]));
+      body.appendChild(el("div", { class: "btn-row", style: "margin-bottom:16px" }, [
+        el("button", { class: "btn primary sm", text: I18N.t("proj.save"),
+          onclick: function () {
+            const nm = nameInput.value.trim();
+            if (!nm) { toast(I18N.t("proj.name"), "bad"); return; }
+            const rec = Projects.save(nm, snapshot(), STATE.projectId);
+            if (!rec) {
+              toast("Could not save — this browser's local storage is full. "
+                    + "Delete an old project or export it to a file first.",
+                    "bad", 9000);
+              return;
+            }
+            STATE.projectId = rec.id;
+            STATE.projectName = rec.name;
+            toast(I18N.t("proj.saved"), "good");
+            closeDrawer(); openProjects();
+          } }),
+        el("button", { class: "btn sm", text: I18N.t("proj.saveAs"),
+          onclick: function () {
+            const nm = nameInput.value.trim();
+            if (!nm) { toast(I18N.t("proj.name"), "bad"); return; }
+            const rec = Projects.save(nm, snapshot(), null);
+            if (rec) {
+              STATE.projectId = rec.id; STATE.projectName = rec.name;
+              toast(I18N.t("proj.saved"), "good");
+              closeDrawer(); openProjects();
+            }
+          } })
+      ]));
+
+      const list = Projects.all();
+      body.appendChild(el("div", { class: "section-title",
+        text: I18N.t("proj.title") + " (" + list.length + ")" }));
+      if (!list.length) {
+        body.appendChild(el("p", { class: "tiny", text: I18N.t("proj.none") }));
+      }
+      list.forEach(function (p) {
+        const when = new Date(p.modified);
+        body.appendChild(el("div", { class: "proj-item" }, [
+          el("div", { class: "pb" }, [
+            el("div", { class: "pn" }, [
+              el("span", { text: p.name }),
+              p.id === STATE.projectId
+                ? el("span", { class: "chip info", style: "margin-left:6px",
+                               text: I18N.t("proj.current") }) : null
+            ]),
+            el("div", { class: "pd", text: I18N.t("proj.modified") + " "
+              + when.toLocaleString() })
+          ]),
+          el("div", { class: "pa" }, [
+            el("button", { class: "btn sm", text: I18N.t("btn.load"),
+              onclick: function () {
+                restore(p.payload);
+                STATE.projectId = p.id; STATE.projectName = p.name;
+                toast(I18N.t("proj.loaded"), "good");
+                closeDrawer();
+              } }),
+            el("button", { class: "btn sm", text: I18N.t("btn.rename"),
+              onclick: function () {
+                const nm = prompt(I18N.t("proj.name"), p.name);
+                if (nm && nm.trim()) {
+                  Projects.rename(p.id, nm.trim());
+                  if (STATE.projectId === p.id) STATE.projectName = nm.trim();
+                  closeDrawer(); openProjects();
+                }
+              } }),
+            el("button", { class: "btn sm danger", text: I18N.t("btn.delete"),
+              onclick: function () {
+                if (!confirm(I18N.t("proj.confirmDelete") + "\n\n" + p.name)) return;
+                Projects.remove(p.id);
+                if (STATE.projectId === p.id) {
+                  STATE.projectId = null; STATE.projectName = "";
+                }
+                toast(I18N.t("proj.deleted"), "good");
+                closeDrawer(); openProjects();
+              } })
+          ])
+        ]));
+      });
+
+      body.appendChild(el("div", { class: "section-title", text: "Transfer" }));
+      body.appendChild(el("p", { class: "tiny", html:
+        "Projects are stored in this browser only. Export to a file to move one "
+        + "to another computer, or to keep a backup." }));
+      body.appendChild(el("div", { class: "btn-row" }, [
+        el("button", { class: "btn sm", text: I18N.t("proj.export"),
+          onclick: function () {
+            const blob = new Blob([JSON.stringify({
+              app: "AdsorpFit", version: Projects.VERSION,
+              exported: new Date().toISOString(), projects: Projects.all()
+            }, null, 2)], { type: "application/json" });
+            download(blob, "adsorpfit-projects.json");
+          } }),
+        (function () {
+          const lab = el("label", { class: "btn sm", style: "margin:0" },
+                         [I18N.t("proj.import")]);
+          const inp = el("input", { type: "file", accept: ".json", hidden: "" });
+          inp.onchange = function () {
+            const f = inp.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = function () {
+              try {
+                const parsed = JSON.parse(r.result);
+                const incoming = parsed.projects || [];
+                if (!incoming.length) throw new Error("no projects in that file");
+                let n = 0;
+                incoming.forEach(function (p) {
+                  if (Projects.save(p.name, p.payload, null)) n++;
+                });
+                toast("Imported " + n + " project(s).", "good");
+                closeDrawer(); openProjects();
+              } catch (e) {
+                toast("Could not read that file: " + e.message, "bad", 7000);
+              }
+            };
+            r.readAsText(f);
+          };
+          lab.appendChild(inp);
+          return lab;
+        })()
+      ]));
+    });
+  }
+
+  function redrawAllFigures() {
+    ["kinetics", "isotherm"].forEach(function (c) {
+      if (STATE[c].fit) drawMainFigure(c);
+    });
+    if (STATE.thermo.result) renderThermo();
   }
 
   /* ================================================================= guide */
@@ -1866,19 +2593,36 @@
       };
     });
 
-    $("#theme-toggle").onclick = function () {
-      const next = theme() === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
-      try { localStorage.setItem("adsorpfit-theme", next); } catch (e) {}
+    $("#settings-btn").onclick = openSettings;
+    $("#projects-btn").onclick = openProjects;
+
+    const ls = $("#lang-switch");
+    I18N.languages.forEach(function (l) {
+      const b = el("button", { type: "button", text: l[0].toUpperCase(),
+                               title: l[1] });
+      b.setAttribute("aria-pressed", I18N.get() === l[0] ? "true" : "false");
+      b.onclick = function () { I18N.set(l[0]); };
+      ls.appendChild(b);
+    });
+    I18N.onChange(function (lang) {
+      $$("#lang-switch button").forEach(function (b) {
+        b.setAttribute("aria-pressed",
+          b.textContent.toLowerCase() === lang ? "true" : "false");
+      });
+      // re-render anything whose text was generated rather than marked up
       ["kinetics", "isotherm"].forEach(function (c) {
-        if (STATE[c].fit) drawMainFigure(c);
+        if (STATE[c].fit) renderResults(c);
+        renderAdvice(c);
       });
       if (STATE.thermo.result) renderThermo();
-    };
-    try {
-      const saved = localStorage.getItem("adsorpfit-theme");
-      if (saved) document.documentElement.setAttribute("data-theme", saved);
-    } catch (e) {}
+      buildGuide();
+    });
+
+    Prefs.onChange(function () { redrawAllFigures(); });
+
+    $$("[data-advise]").forEach(function (b) {
+      b.onclick = function () { runAdvisor(b.dataset.advise); };
+    });
 
     $("#kin-run").onclick = function () { runFit("kinetics"); };
     $("#iso-run").onclick = function () { runFit("isotherm"); };
@@ -2000,7 +2744,15 @@
 
   /* =================================================================== go */
 
+  function start() {
+    I18N.init();
+    Prefs.init();
+    I18N.apply(document);
+    wire();
+    boot();
+  }
+
   if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", function () { wire(); boot(); });
-  else { wire(); boot(); }
+    document.addEventListener("DOMContentLoaded", start);
+  else start();
 })();

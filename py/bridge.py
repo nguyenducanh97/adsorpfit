@@ -21,6 +21,7 @@ from core import (ModelSpec, fit_model, fit_linear, rank_models, statistics,
 from isotherms import ISOTHERM_MODELS
 from kinetics import KINETIC_MODELS, boyd_bt
 import thermo as th
+import advisor as adv
 
 ALL_MODELS: dict[str, ModelSpec] = {}
 ALL_MODELS.update(ISOTHERM_MODELS)
@@ -179,6 +180,21 @@ def fit(payload_json: str) -> str:
         return _err(exc, traceback.format_exc())
 
 
+def advise(payload_json: str) -> str:
+    """Screen every model against the physics of the raw data.
+
+    payload = {category, x, y, ctx, models?}
+    """
+    try:
+        p = json.loads(payload_json)
+        out = adv.advise(p["category"], p["x"], p["y"],
+                         ctx=p.get("ctx", {}) or {},
+                         models=p.get("models"))
+        return _ok(out)
+    except Exception as exc:
+        return _err(exc, traceback.format_exc())
+
+
 def _result_to_dict(r, spec, ctx, with_curve=True):
     d = {
         "model_key": r.model_key, "model_name": r.model_name,
@@ -190,6 +206,7 @@ def _result_to_dict(r, spec, ctx, with_curve=True):
         "residuals": _clean(r.residuals),
         "y_cal": _clean(r.y_cal),
         "warnings": list(r.warnings),
+        "issues": list(r.issues),
         "equation": spec.equation, "equation_plain": spec.equation_plain,
         "citation": spec.citation, "assumptions": spec.assumptions,
         "family": spec.family, "category": spec.category,

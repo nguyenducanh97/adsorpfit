@@ -5,35 +5,40 @@
    experimental points in both light and dark themes.
    ========================================================================== */
 
+/* Palette inherited from BrineFlow so the two SWAT · UTOP tools read as one
+   family: the same cyan accent (#37c8cf), the same deep navy structure, the
+   same two-tone wordmark. The light theme is a derived companion — the
+   accent is darkened to #12839a there so it still passes contrast on white. */
 :root {
-  --ocean-950: #03202f;
-  --ocean-900: #062c43;
-  --ocean-800: #084863;
-  --ocean-700: #0a5a7e;
-  --ocean-600: #1073a0;
-  --ocean-500: #1b8cb8;
-  --aqua-400: #2aa9c4;
-  --aqua-300: #5cc6d8;
-  --aqua-200: #9adde8;
-  --foam-100: #e4f3f8;
-  --foam-50: #f2fafc;
+  --ocean-950: #03141f;
+  --ocean-900: #060e17;
+  --ocean-800: #0b1a28;
+  --ocean-700: #12374d;
+  --ocean-600: #1a93a8;
+  --ocean-500: #2aa9bd;
+  --aqua-400: #37c8cf;
+  --aqua-300: #6fdce1;
+  --aqua-200: #a6ebee;
+  --foam-100: #e2f2f5;
+  --foam-50: #f1fafb;
 
-  --coral: #d94f3d;
-  --coral-dark: #b33a2a;
-  --amber: #e8a33d;
-  --violet: #7b5ea7;
-  --green: #2e9e6b;
+  --coral: #d4453c;
+  --coral-dark: #a8322b;
+  --amber: #d38b1c;
+  --violet: #6f5a9e;
+  --green: #1f8f61;
 
-  --bg: #eef6f9;
+  --bg: #eaf2f6;
   --surface: #ffffff;
-  --surface-2: #f7fbfd;
-  --surface-glass: rgba(255, 255, 255, 0.82);
-  --border: #cfe0e8;
-  --border-strong: #a9c7d4;
-  --text: #0d2b38;
-  --text-2: #46626f;
-  --text-3: #7a95a3;
-  --text-muted: #6b8592;
+  --surface-2: #f5fafc;
+  --surface-glass: rgba(255, 255, 255, 0.84);
+  --border: #cbdde6;
+  --border-strong: #a3c2d0;
+  --text: #0d2530;
+  --text-2: #41606e;
+  --text-3: #74919f;
+  --text-muted: #5b7a8c;
+  --accent: #12839a;
   --shadow-sm: 0 1px 2px rgba(6, 44, 67, 0.06), 0 2px 6px rgba(6, 44, 67, 0.05);
   --shadow: 0 2px 8px rgba(6, 44, 67, 0.08), 0 8px 24px rgba(6, 44, 67, 0.07);
   --shadow-lg: 0 8px 32px rgba(6, 44, 67, 0.13), 0 2px 8px rgba(6, 44, 67, 0.08);
@@ -49,22 +54,26 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #04161f;
-  --surface: #0a2130;
-  --surface-2: #0d2a3b;
-  --surface-glass: rgba(10, 33, 48, 0.86);
-  --border: #1b435a;
-  --border-strong: #2a5d78;
-  --text: #dbeef5;
-  --text-2: #9cbccb;
-  --text-muted: #7ba0b2;
-  --foam-100: #0d2a3b;
-  --foam-50: #0a2130;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --coral: #ff7a63;
+  --bg: #060e17;
+  --surface: #0b1a28;
+  --surface-2: #0f2233;
+  --surface-glass: rgba(12, 24, 37, 0.88);
+  --border: #1e394f;
+  --border-strong: #27506e;
+  --text: #dceaf3;
+  --text-2: #9fc0d0;
+  --text-3: #6f8fa3;
+  --text-muted: #7797ac;
+  --foam-100: #0f2233;
+  --foam-50: #0b1a28;
+  --accent: #37c8cf;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --coral: #ff6058;
+  --coral-dark: #d4453c;
   --amber: #ffc46b;
+  --green: #35c48a;
 }
 
 * { box-sizing: border-box; }
@@ -565,3 +574,217 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 .toast.bad { background: var(--coral-dark); }
 .toast.good { background: var(--green); }
 @keyframes slidein { from { transform: translateX(20px); opacity: 0; } }
+
+/* ==========================================================================
+   Preference-driven modes
+   Layout, density and motion are all driven by data-* attributes on <html>,
+   set by prefs.js, so switching any of them is a single attribute write with
+   no re-render of the page.
+   ========================================================================== */
+
+/* --- layout ------------------------------------------------------------- */
+:root[data-layout="right"] .grid-2 {
+  grid-template-columns: 1fr minmax(360px, 420px);
+}
+:root[data-layout="right"] .grid-2 > .col-left  { order: 2; }
+:root[data-layout="right"] .grid-2 > .col-right { order: 1; }
+
+:root[data-layout="stack"] .grid-2 { grid-template-columns: 1fr; }
+:root[data-layout="stack"] .figure-shell { grid-template-columns: 1fr; }
+:root[data-layout="stack"] .style-stack { max-height: none; }
+
+/* --- density ------------------------------------------------------------ */
+:root[data-density="compact"] {
+  --radius: 9px; --radius-sm: 6px; --radius-lg: 13px;
+}
+:root[data-density="compact"] body { font-size: 13.5px; line-height: 1.5; }
+:root[data-density="compact"] .panel-body { padding: 12px; }
+:root[data-density="compact"] .panel-head { padding: 9px 13px; }
+:root[data-density="compact"] .panel { margin-bottom: 12px; }
+:root[data-density="compact"] label.field { margin-bottom: 8px; }
+:root[data-density="compact"] table.data td,
+:root[data-density="compact"] table.data th { padding: 5px 8px; }
+:root[data-density="compact"] .model-item { padding: 5px 8px; }
+:root[data-density="compact"] .interp li { margin-bottom: 7px; }
+:root[data-density="compact"] .shell { padding: 0 16px 60px; }
+
+/* --- motion ------------------------------------------------------------- */
+:root[data-motion="calm"] .wave-1 { animation-duration: 70s; opacity: .18; }
+:root[data-motion="calm"] .wave-2 { animation-duration: 95s; opacity: .13; }
+:root[data-motion="calm"] .wave-3 { animation-duration: 130s; opacity: .09; }
+:root[data-motion="calm"] #bubbles { display: none; }
+:root[data-motion="calm"] #caustics { opacity: .12; }
+
+:root[data-motion="off"] .wave-1,
+:root[data-motion="off"] .wave-2,
+:root[data-motion="off"] .wave-3,
+:root[data-motion="off"] .bubble { animation: none !important; }
+:root[data-motion="off"] #bubbles,
+:root[data-motion="off"] #caustics { display: none; }
+
+/* ==========================================================================
+   Masthead additions
+   ========================================================================== */
+
+.brand-name b { color: var(--accent); font-weight: 700; }
+
+.masthead-tools { display: flex; gap: 6px; align-items: center; }
+
+.lang-switch {
+  display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; background: var(--surface);
+}
+.lang-switch button {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 700; padding: 7px 10px;
+  color: var(--text-muted); transition: background .15s, color .15s;
+}
+.lang-switch button[aria-pressed="true"] {
+  background: var(--ocean-600); color: #fff;
+}
+
+footer.site-foot {
+  border-top: 1px solid var(--border);
+  margin-top: 40px; padding: 22px 26px 40px;
+  text-align: center; font-size: 12px; color: var(--text-muted);
+  background: var(--surface-glass);
+}
+footer.site-foot a { color: var(--accent); text-decoration: none; font-weight: 600; }
+footer.site-foot a:hover { text-decoration: underline; }
+footer.site-foot .fl { margin-bottom: 5px; }
+
+/* ==========================================================================
+   Equations (KaTeX)
+   ========================================================================== */
+
+.equation {
+  font-size: 15px; text-align: center;
+  padding: 15px 13px; margin: 0 0 14px;
+  background: var(--foam-50); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); overflow-x: auto; overflow-y: hidden;
+}
+.equation .katex { font-size: 1.16em; color: var(--text); }
+.equation.fallback { font-family: var(--mono); font-size: 12.5px; }
+.mi-eq .katex { font-size: .92em; }
+.mi-eq { line-height: 1.9; white-space: normal; }
+
+/* ==========================================================================
+   Advisor
+   ========================================================================== */
+
+.advice-group { margin-bottom: 16px; }
+.advice-head {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .7px;
+}
+.advice-head .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.advice-head.recommend { color: var(--green); }
+.advice-head.recommend .dot { background: var(--green); }
+.advice-head.usable { color: var(--amber); }
+.advice-head.usable .dot { background: var(--amber); }
+.advice-head.avoid { color: var(--coral); }
+.advice-head.avoid .dot { background: var(--coral); }
+.advice-head .line { flex: 1; height: 1px; background: var(--border); }
+
+.advice-item {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-bottom: 7px; background: var(--surface);
+  border-left: 3px solid var(--border);
+}
+.advice-item.recommend { border-left-color: var(--green); }
+.advice-item.usable { border-left-color: var(--amber); }
+.advice-item.avoid { border-left-color: var(--coral); }
+.advice-item .ai-top {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+.advice-item .ai-name { font-weight: 650; font-size: 13.5px; }
+.advice-item .ai-why { margin: 0; padding-left: 16px; font-size: 12.5px;
+  color: var(--text-2); line-height: 1.55; }
+.advice-item .ai-why li { margin-bottom: 4px; }
+.advice-item label.pick {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  margin-left: auto; font-size: 11.5px; color: var(--text-muted);
+}
+.advice-item label.pick input { accent-color: var(--ocean-600); }
+
+/* ==========================================================================
+   Issues
+   ========================================================================== */
+
+.issue { border-left: 3px solid; }
+.issue.block { border-left-color: var(--coral); }
+.issue.warn  { border-left-color: var(--amber); }
+.issue.info  { border-left-color: var(--ocean-600); }
+
+.badge-block, .badge-warn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .5px;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 5px;
+}
+.badge-block { background: var(--coral); color: #fff; }
+.badge-warn { background: var(--amber); color: #2c1e00; }
+
+/* ==========================================================================
+   Settings & projects drawer
+   ========================================================================== */
+
+.drawer-back {
+  position: fixed; inset: 0; z-index: 140;
+  background: rgba(3, 20, 31, .5); backdrop-filter: blur(3px);
+}
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 141;
+  width: min(430px, 100%); background: var(--surface);
+  border-left: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+  animation: slidein-drawer .22s ease;
+}
+@keyframes slidein-drawer { from { transform: translateX(24px); opacity: .4; } }
+:root[data-motion="off"] .drawer { animation: none; }
+.drawer-head {
+  display: flex; align-items: center; gap: 10px; padding: 15px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-head h3 { margin: 0; font-size: 15.5px; }
+.drawer-body { padding: 18px; overflow-y: auto; flex: 1; }
+
+.seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  margin-bottom: 14px;
+}
+.seg button {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 6px;
+  color: var(--text-2); border-right: 1px solid var(--border);
+  transition: background .14s, color .14s;
+}
+.seg button:last-child { border-right: none; }
+.seg button:hover { background: var(--surface-2); }
+.seg button[aria-pressed="true"] { background: var(--ocean-600); color: #fff; }
+
+.proj-item {
+  display: flex; align-items: center; gap: 9px; padding: 10px 11px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  margin-bottom: 7px; background: var(--surface-2);
+}
+.proj-item .pn { font-weight: 650; font-size: 13.5px; }
+.proj-item .pd { font-size: 11.5px; color: var(--text-muted); }
+.proj-item .pa { margin-left: auto; display: flex; gap: 4px; flex: none; }
+.proj-item .pb { min-width: 0; flex: 1; }
+
+/* Korean text needs a font with proper hangul coverage; Inter has none, so
+   the stack is swapped when the document language is Korean. */
+:root[lang="ko"] body,
+:root[lang="ko"] input,
+:root[lang="ko"] select,
+:root[lang="ko"] textarea,
+:root[lang="ko"] button {
+  font-family: "Noto Sans KR", "Malgun Gothic", var(--sans);
+}
+:root[lang="ko"] .brand-name,
+:root[lang="ko"] .mono,
+:root[lang="ko"] table.data td.num { font-family: var(--sans); }
+:root[lang="ko"] .brand-sub { letter-spacing: 0; }

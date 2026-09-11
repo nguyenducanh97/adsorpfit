@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt
+from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue
 
 # --------------------------------------------------------------------------
 # guess helpers
@@ -1264,6 +1264,206 @@ MARCZEWSKI_JARONIEC = ModelSpec(
             else "the high-energy tail is broader.")),
     ],
 )
+
+
+# --------------------------------------------------------------------------
+# Domain of applicability
+#
+# Attached after the specs are built so each rule sits next to the others and
+# can be read as a single audit of where these models break down.  Several of
+# these equations are unbounded below and will happily return a negative
+# loading; least squares has no objection, so the check has to be explicit.
+# --------------------------------------------------------------------------
+
+def _temkin_domain(x, y, ctx):
+    """Temkin diverges to -inf as Ce -> 0, so dilute data are out of bounds."""
+    out = []
+    lo, hi = float(np.min(x)), float(np.max(x))
+    if lo <= 0:
+        return [issue("block", "temkin_zero",
+                      "The Temkin equation contains ln(A_T·C_e) and is undefined "
+                      "at C_e = 0.")]
+    if hi / lo > 100:
+        out.append(issue(
+            "warn", "temkin_wide_range",
+            f"Your concentrations span {hi / lo:.0f}-fold ({fmt(lo)} to {fmt(hi)}). "
+            f"Temkin is a mid-coverage approximation — it has no plateau at high "
+            f"C_e and diverges to −∞ as C_e → 0 — so over a range this wide it is "
+            f"likely to misrepresent at least one end."))
+    return out
+
+
+def _temkin_valid_range(p, ctx):
+    at = p.get("AT", 0.0)
+    return (1.0 / at, np.inf) if at > 0 else (None, None)
+
+
+def _temkin_validity(p, x, y, ctx):
+    at = p.get("AT", 0.0)
+    if at <= 0:
+        return []
+    c_min = 1.0 / at
+    below = int(np.sum(np.asarray(x) < c_min))
+    if below:
+        return [issue(
+            "block", "temkin_below_threshold",
+            f"With the fitted A_T = {fmt(at)} L/g, the Temkin equation predicts a "
+            f"negative q_e for any C_e below 1/A_T = {fmt(c_min)} mg/L. "
+            f"{below} of your {len(x)} points fall in that region, so the model is "
+            f"being extrapolated outside its own domain. Either drop the dilute "
+            f"points and refit over the mid-coverage range Temkin was derived for, "
+            f"or use a model that is bounded below — Langmuir, Sips or Tóth all "
+            f"behave correctly as C_e → 0.")]
+    margin = c_min / float(np.min(x))
+    if margin > 0.5:
+        return [issue(
+            "warn", "temkin_near_threshold",
+            f"Your lowest point (C_e = {fmt(float(np.min(x)))}) sits close to the "
+            f"threshold 1/A_T = {fmt(c_min)} below which Temkin turns negative. "
+            f"The fit is valid, but do not extrapolate it to lower concentrations.")]
+    return []
+
+
+def _harkins_jura_valid_range(p, ctx):
+    b = p.get("B", None)
+    return (None, 10.0 ** b) if b is not None and np.isfinite(b) else (None, None)
+
+
+def _harkins_jura_validity(p, x, y, ctx):
+    b = p.get("B", np.nan)
+    if not np.isfinite(b):
+        return []
+    c_max = 10.0 ** b
+    above = int(np.sum(np.asarray(x) >= c_max))
+    if above:
+        return [issue(
+            "block", "hj_above_threshold",
+            f"The Harkins–Jura equation contains 1/(B − log C_e) and is undefined "
+            f"once C_e reaches 10^B = {fmt(c_max)} mg/L. {above} of your "
+            f"{len(x)} points are at or beyond that, where the model has no value "
+            f"to return. Those points cannot constrain the fit, so the reported "
+            f"statistics describe only the remaining ones.")]
+    return []
+
+
+def _bet_domain(x, y, ctx):
+    cs = ctx.get("Cs")
+    hi = float(np.max(x))
+    if not cs:
+        return [issue(
+            "warn", "bet_no_cs",
+            "The liquid-phase BET model needs the adsorbate's saturation "
+            "concentration C_s (its solubility limit). Without it a placeholder is "
+            "used and neither q_s nor C_BET means anything. Enter C_s in the "
+            "experiment panel.")]
+    if hi >= float(cs):
+        return [issue(
+            "block", "bet_above_cs",
+            f"Your highest C_e ({fmt(hi)} mg/L) is at or above the saturation "
+            f"concentration C_s = {fmt(float(cs))} mg/L. BET contains (C_s − C_e) "
+            f"in its denominator and diverges there — the solution would be "
+            f"supersaturated, which is outside the model's physical premise.")]
+    if hi / float(cs) < 0.05:
+        return [issue(
+            "warn", "bet_far_from_cs",
+            f"Your data reach only {100 * hi / float(cs):.1f}% of the saturation "
+            f"concentration. BET describes multilayer build-up, which only becomes "
+            f"significant as C_e approaches C_s, so there is little multilayer "
+            f"behaviour here for the model to detect.")]
+    return []
+
+
+def _needs_positive_x(name):
+    def f(x, y, ctx):
+        if np.any(np.asarray(x) <= 0):
+            return [issue("block", "nonpositive_x",
+                          f"The {name} equation is logarithmic in C_e and is "
+                          f"undefined at C_e = 0.")]
+        return []
+    return f
+
+
+def _plateau_domain(x, y, ctx):
+    """Saturating models need the data to actually approach saturation."""
+    y = np.asarray(y, float)
+    if y.size < 4:
+        return []
+    # fractional rise over the last third of the concentration range
+    k = max(1, y.size // 3)
+    tail = y[-k:]
+    span = float(np.max(y) - np.min(y))
+    if span <= 0:
+        return []
+    rise = (float(np.max(tail)) - float(np.min(tail))) / span
+    if rise > 0.25:
+        return [issue(
+            "warn", "no_plateau",
+            f"Your isotherm is still rising steeply at the highest concentration "
+            f"— the top third of the data accounts for {rise * 100:.0f}% of the "
+            f"total change in q_e. A saturation capacity fitted to data that never "
+            f"plateau is an extrapolation, not a measurement. Extend the "
+            f"concentration range if q_max is the number you want to report.")]
+    return []
+
+
+def _baudu_validity(p, x, y, ctx):
+    a, b = 1.0 + p.get("x", 0) + p.get("y", 0), 1.0 + p.get("x", 0)
+    if not (0 < a < 1 and 0 < b < 1):
+        return [issue(
+            "block", "baudu_domain",
+            f"The Baudu model requires both 1+x+y and 1+x to lie strictly between "
+            f"0 and 1. The fit gives 1+x+y = {fmt(a)} and 1+x = {fmt(b)}, so these "
+            f"parameters are outside the model's stated domain of applicability "
+            f"and should not be reported.")]
+    return []
+
+
+def _koble_validity(p, x, y, ctx):
+    n = p.get("n", 1.0)
+    if n < 1:
+        return [issue(
+            "warn", "koble_n_lt_1",
+            f"Koble and Corrigan noted that n must be at least 1 for the model to "
+            f"be thermodynamically consistent. The fit gives n = {fmt(n)}, below "
+            f"that limit, which means another model describes these data better.")]
+    return []
+
+
+def _dr_domain(x, y, ctx):
+    if not ctx.get("MW"):
+        return [issue(
+            "info", "dr_units",
+            "The Polanyi potential ε = RT·ln(1 + 1/C_e) requires C_e in mol/L for "
+            "the mean free energy E to come out in J/mol. Enter the adsorbate "
+            "molar mass and AdsorpFit will convert; without it, E carries the units "
+            "of your C_e and is not comparable with published values.")]
+    return []
+
+
+LANGMUIR.domain = _plateau_domain
+JOVANOVIC.domain = _plateau_domain
+SIPS.domain = _plateau_domain
+TOTH.domain = _plateau_domain
+KHAN.domain = _plateau_domain
+RADKE_PRAUSNITZ.domain = _plateau_domain
+HILL.domain = _plateau_domain
+BROUERS_SOTOLONGO.domain = _plateau_domain
+MARCZEWSKI_JARONIEC.domain = _plateau_domain
+
+TEMKIN.domain = _temkin_domain
+TEMKIN.valid_range = _temkin_valid_range
+TEMKIN.validity = _temkin_validity
+
+HARKINS_JURA.valid_range = _harkins_jura_valid_range
+HARKINS_JURA.validity = _harkins_jura_validity
+
+BET.domain = _bet_domain
+FREUNDLICH.domain = _needs_positive_x("Freundlich")
+HALSEY.domain = _needs_positive_x("Halsey")
+HARKINS_JURA.domain = _needs_positive_x("Harkins–Jura")
+DUBININ.domain = _dr_domain
+BAUDU.validity = _baudu_validity
+KOBLE_CORRIGAN.validity = _koble_validity
 
 
 # --------------------------------------------------------------------------
