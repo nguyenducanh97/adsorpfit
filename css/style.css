@@ -220,11 +220,12 @@ nav.tabs button[aria-selected="true"] {
 }
 
 .icon-btn {
-  appearance: none; border: 1px solid var(--border); background: var(--surface);
-  color: var(--text-2); width: 36px; height: 36px; border-radius: 9px;
-  display: grid; place-items: center; cursor: pointer; transition: all .16s;
+  appearance: none; border: 1px solid transparent; background: transparent;
+  color: var(--text-2); width: 40px; height: 40px; border-radius: 9px;
+  display: grid; place-items: center; cursor: pointer;
+  transition: background .16s, color .16s;
 }
-.icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-btn:hover { background: var(--foam-100); color: var(--text); }
 
 /* ==========================================================================
    Panels
@@ -617,16 +618,18 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
    Masthead additions
    ========================================================================== */
 
-.masthead-tools { display: flex; gap: 6px; align-items: center; }
+.masthead-tools { display: flex; gap: 3px; align-items: center; }
 
 .lang-switch {
   display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
   overflow: hidden; background: var(--surface);
 }
+.lang-switch { height: 40px; align-items: center; border-radius: 9px; }
 .lang-switch button {
   appearance: none; border: none; background: transparent; cursor: pointer;
-  font: inherit; font-size: 12px; font-weight: 700; padding: 7px 10px;
-  color: var(--text-muted); transition: background .15s, color .15s;
+  font: inherit; font-size: 12px; font-weight: 700; padding: 0 12px;
+  height: 100%; color: var(--text-muted);
+  transition: background .15s, color .15s;
 }
 .lang-switch button[aria-pressed="true"] {
   background: var(--ocean-600); color: #fff;
@@ -876,57 +879,51 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 #plot-area, [id$="-plot"] { min-height: 220px; }
 
 /* ==========================================================================
-   Institutional marks
-   The official SWAT, SKKU and U-TOP logos are dark artwork on transparency,
-   so on the dark theme they need lifting rather than recolouring: a light
-   plate behind them keeps the brand colours intact, which simply inverting
-   them would not.
-   ========================================================================== */
-
-@media (max-width: 1080px) {  }
-
-/* The artwork is dark on transparency. On the dark theme it sits on a light
-   plate rather than being inverted, which would wreck the brand colours. */
-:root[data-theme="dark"] .lab-mark .mark,
-:root[data-theme="dark"] 
-:root[data-theme="dark"] 
-
-/* ==========================================================================
    Toolbar buttons, focus mode and panel resizing
    ========================================================================== */
 
-/* Proportions taken from BrineFlow's .tb so the two toolbars match. */
+/* The masthead already has a button language: the tab pills. The tool
+   buttons borrow it exactly, so the row reads as one set of controls rather
+   than two. Same height, radius, weight and hover fill; the only difference
+   is that these carry an icon and do not take a selected state. */
 .tool-btn {
-  appearance: none; font: inherit; font-size: 12.2px; font-weight: 600;
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 11px; border-radius: 8px; cursor: pointer;
-  background: color-mix(in srgb, var(--ocean-600) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ocean-600) 28%, transparent);
-  color: var(--text-2); transition: .16s; white-space: nowrap;
-  position: relative;
+  appearance: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s, color .16s, border-color .16s;
 }
-.tool-btn:hover {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color: var(--accent); color: var(--text);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 26%, transparent);
-  transform: translateY(-1px);
+.tool-btn:hover { background: var(--foam-100); color: var(--text); }
+.tool-btn:active { background: color-mix(in srgb, var(--ocean-600) 14%, transparent); }
+.tool-btn .ti {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; opacity: .75;
 }
-:root[data-motion="off"] .tool-btn:hover { transform: none; }
-:root[data-theme="dark"] .tool-btn {
-  background: rgba(255, 255, 255, .08);
-  border-color: rgba(150, 220, 235, .25);
-  color: #dff4f8;
-}
-.tool-btn .ti { display: grid; place-items: center; opacity: .9; }
+.tool-btn:hover .ti { opacity: 1; }
 .tool-btn .ti svg { display: block; }
 .proj-badge {
-  max-width: 140px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-weight: 600; font-size: 11.5px;
-  padding: 1px 7px; border-radius: 999px;
-  background: color-mix(in srgb, var(--ocean-600) 16%, transparent);
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-weight: 600; font-size: 11px;
+  padding: 2px 8px; border-radius: 999px; line-height: 1.5;
+  background: color-mix(in srgb, var(--ocean-600) 14%, transparent);
   color: var(--ocean-600);
 }
-:root[data-theme="dark"] .proj-badge { color: var(--aqua-300); }
+:root[data-theme="dark"] .proj-badge {
+  color: var(--aqua-300);
+  background: color-mix(in srgb, var(--aqua-400) 16%, transparent);
+}
 @media (max-width: 1240px) { .tool-btn span:not(.ti):not(.proj-badge) { display: none; } }
 
 /* --- focus a single panel over the window -------------------------------- */
@@ -1065,3 +1062,31 @@ footer.site-foot a:hover { text-decoration: underline; }
 
 :root[lang="ko"] .title h1 { font-family: var(--sans); }
 :root[lang="ko"] .title p { letter-spacing: 0; }
+
+/* --- field help buttons --------------------------------------------------- */
+
+label.field > span.lbl { display: flex; align-items: center; gap: 6px; }
+
+.field-info {
+  appearance: none; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-muted); width: 16px; height: 16px; flex: none;
+  border-radius: 50%; font-size: 10.5px; font-weight: 800; line-height: 1;
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.field-info:hover {
+  background: var(--ocean-600); border-color: var(--ocean-600); color: #fff;
+}
+
+.help-body p { margin: 0 0 12px; line-height: 1.65; }
+.help-body p:last-child { margin-bottom: 0; }
+.help-body ul { margin: 0 0 12px; padding-left: 20px; }
+.help-body li { margin-bottom: 7px; line-height: 1.6; }
+.help-body .egs {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
+  font-size: 13px; margin: 10px 0 14px; padding: 11px 13px;
+  background: var(--foam-50); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.help-body .egs b { font-weight: 600; }
+.help-body .egs span { font-family: var(--mono); font-size: 12.5px; text-align: right; }

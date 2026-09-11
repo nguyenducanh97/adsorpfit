@@ -305,6 +305,172 @@
     document.body.appendChild(back);
   }
 
+  /* ============================================================ field help */
+
+  // Longer explanations live behind the "?" beside a field rather than under
+  // it, so the panel stays scannable but the answer is one click away.
+  // Written for someone who has the number in front of them and does not know
+  // what it is for.
+  const FIELD_HELP = {
+    mw: {
+      en: {
+        title: "Molar mass",
+        html:
+          "<p>The molecular weight of <b>the substance you are adsorbing</b>, " +
+          "not the adsorbent. If you are removing caffeine with biochar, this " +
+          "is caffeine's molar mass, not the biochar's.</p>" +
+          "<div class='egs'>" +
+          "<b>Caffeine</b><span>194.19</span>" +
+          "<b>Methylene blue</b><span>319.85</span>" +
+          "<b>Phenol</b><span>94.11</span>" +
+          "<b>Pb(II)</b><span>207.2</span>" +
+          "<b>Cd(II)</b><span>112.41</span>" +
+          "</div>" +
+          "<p>Exactly two calculations need it:</p><ul>" +
+          "<li><b>Dubinin–Radushkevich.</b> Its mean free energy E comes from " +
+          "the Polanyi potential, &epsilon; = RT ln(1 + 1/C<sub>e</sub>), which " +
+          "is only dimensionally correct with C<sub>e</sub> in mol/L. Without " +
+          "the molar mass your C<sub>e</sub> stays in mg/L, so E carries the " +
+          "wrong units and cannot be compared either with published values or " +
+          "with the 8 and 16 kJ/mol thresholds used to argue physisorption " +
+          "against chemisorption.</li>" +
+          "<li><b>Thermodynamics.</b> The recommended route to a dimensionless " +
+          "K° converts the Langmuir constant from L/mg to L/mol before " +
+          "multiplying by the molarity of water, and that conversion is where " +
+          "the molar mass enters.</li></ul>" +
+          "<p>Every other model ignores it, so leave it blank if you are " +
+          "fitting neither.</p>"
+      },
+      ko: {
+        title: "분자량",
+        html:
+          "<p><b>흡착되는 물질</b>의 분자량입니다. 흡착제의 분자량이 아닙니다. " +
+          "바이오차로 카페인을 제거한다면 카페인의 분자량을 입력합니다.</p>" +
+          "<div class='egs'>" +
+          "<b>카페인</b><span>194.19</span>" +
+          "<b>메틸렌 블루</b><span>319.85</span>" +
+          "<b>페놀</b><span>94.11</span>" +
+          "<b>Pb(II)</b><span>207.2</span>" +
+          "<b>Cd(II)</b><span>112.41</span>" +
+          "</div>" +
+          "<p>다음 두 계산에서만 사용됩니다.</p><ul>" +
+          "<li><b>Dubinin–Radushkevich.</b> 평균 자유에너지 E는 Polanyi 퍼텐셜 " +
+          "&epsilon; = RT ln(1 + 1/C<sub>e</sub>)에서 구하는데, 이 식은 " +
+          "C<sub>e</sub>가 mol/L일 때만 차원이 맞습니다. 분자량이 없으면 " +
+          "C<sub>e</sub>가 mg/L로 남아 E의 단위가 틀리게 되고, 문헌값이나 " +
+          "물리흡착·화학흡착 기준인 8, 16 kJ/mol과 비교할 수 없습니다.</li>" +
+          "<li><b>열역학.</b> 무차원 K°를 구하는 권장 경로에서 Langmuir 상수를 " +
+          "L/mg에서 L/mol로 변환할 때 분자량이 필요합니다.</li></ul>" +
+          "<p>다른 모델은 이 값을 사용하지 않으므로, 두 계산을 하지 않는다면 " +
+          "비워 두어도 됩니다.</p>"
+      }
+    },
+
+    cs: {
+      en: {
+        title: "Solubility Cₛ",
+        html:
+          "<p>The <b>saturation concentration</b> of your adsorbate in water at " +
+          "your working temperature: the highest C<sub>e</sub> that can " +
+          "physically exist before the compound starts coming out of solution. " +
+          "Look it up for your compound; PubChem and solubility tables list it, " +
+          "and it changes with temperature.</p>" +
+          "<div class='egs'>" +
+          "<b>Methylene blue, 25 °C</b><span>43 600 mg/L</span>" +
+          "<b>Phenol, 25 °C</b><span>83 000 mg/L</span>" +
+          "<b>Caffeine, 25 °C</b><span>21 600 mg/L</span>" +
+          "</div>" +
+          "<p><b>Only the BET model uses it.</b> BET describes adsorbate " +
+          "stacking in layers on top of already-adsorbed molecules, and that " +
+          "only becomes significant as the solution approaches saturation. Its " +
+          "equation divides by (C<sub>s</sub> − C<sub>e</sub>), so it diverges " +
+          "at C<sub>e</sub> = C<sub>s</sub>.</p>" +
+          "<p>Two things AdsorpFit will tell you if C<sub>s</sub> is wrong: it " +
+          "blocks the BET fit outright when your highest C<sub>e</sub> reaches " +
+          "or exceeds C<sub>s</sub>, since the solution would be " +
+          "supersaturated; and it warns when your data sit far below " +
+          "C<sub>s</sub>, because then there is little multilayer behaviour for " +
+          "the model to detect and q<sub>s</sub> will be poorly determined.</p>" +
+          "<p>Leave it blank unless you are fitting BET.</p>"
+      },
+      ko: {
+        title: "용해도 Cₛ",
+        html:
+          "<p>사용 온도에서 흡착질이 물에 녹을 수 있는 <b>포화 농도</b>입니다. " +
+          "즉 화합물이 석출되기 전까지 실제로 존재할 수 있는 최대 " +
+          "C<sub>e</sub>입니다. PubChem이나 용해도 표에서 찾을 수 있으며 " +
+          "온도에 따라 달라집니다.</p>" +
+          "<div class='egs'>" +
+          "<b>메틸렌 블루, 25 °C</b><span>43 600 mg/L</span>" +
+          "<b>페놀, 25 °C</b><span>83 000 mg/L</span>" +
+          "<b>카페인, 25 °C</b><span>21 600 mg/L</span>" +
+          "</div>" +
+          "<p><b>BET 모델에서만 사용됩니다.</b> BET는 이미 흡착된 분자 위에 " +
+          "다시 흡착되어 층이 쌓이는 현상을 다루는데, 이는 용액이 포화에 " +
+          "가까워질 때만 뚜렷해집니다. 식의 분모에 (C<sub>s</sub> − " +
+          "C<sub>e</sub>)가 있어 C<sub>e</sub> = C<sub>s</sub>에서 발산합니다.</p>" +
+          "<p>C<sub>s</sub>가 맞지 않으면 두 가지를 알려 줍니다. 최대 " +
+          "C<sub>e</sub>가 C<sub>s</sub> 이상이면 과포화 상태가 되므로 BET " +
+          "피팅을 차단하고, 데이터가 C<sub>s</sub>보다 훨씬 낮으면 다층 흡착 " +
+          "거동이 거의 없어 q<sub>s</sub>가 잘 결정되지 않는다고 경고합니다.</p>" +
+          "<p>BET를 사용하지 않는다면 비워 두어도 됩니다.</p>"
+      }
+    },
+
+    radius: {
+      en: {
+        title: "Particle radius",
+        html:
+          "<p>The mean radius of your adsorbent grains, in centimetres. Measure " +
+          "it by sieve fraction or laser diffraction, and use half the mean " +
+          "diameter.</p>" +
+          "<p>Two diffusion calculations consume it. The <b>Boyd</b> plot turns " +
+          "its slope B into an effective diffusion coefficient through " +
+          "D<sub>i</sub> = B·r²/π². The <b>Crank</b> homogeneous surface " +
+          "diffusion model contains D and r only as the ratio D/r², which is " +
+          "why they cannot be fitted separately.</p>" +
+          "<p>That last point matters: if you let the fit choose r, neither D " +
+          "nor r means anything on its own, only their ratio. Enter your " +
+          "measured radius and treat D as the single fitted quantity.</p>"
+      },
+      ko: {
+        title: "입자 반경",
+        html:
+          "<p>흡착제 입자의 평균 반경(cm)입니다. 체 분석이나 레이저 회절로 " +
+          "측정한 평균 직경의 절반을 사용하세요.</p>" +
+          "<p>두 가지 확산 계산에 사용됩니다. <b>Boyd</b> 그래프는 기울기 B를 " +
+          "D<sub>i</sub> = B·r²/π² 식으로 유효 확산계수로 변환합니다. " +
+          "<b>Crank</b> 균일 표면확산 모델에서는 D와 r이 D/r² 형태로만 " +
+          "나타나므로 둘을 따로 구할 수 없습니다.</p>" +
+          "<p>따라서 r을 피팅에 맡기면 D와 r은 각각으로는 의미가 없고 비율만 " +
+          "의미를 갖습니다. 측정한 반경을 입력하고 D만 피팅 결과로 보세요.</p>"
+      }
+    }
+  };
+
+  function showFieldHelp(key) {
+    const entry = FIELD_HELP[key];
+    if (!entry) return;
+    const t = entry[I18N.get()] || entry.en;
+    const back = el("div", { class: "modal-back", onclick: function (e) {
+      if (e.target === back) back.remove();
+    } });
+    back.appendChild(el("div", { class: "modal", style: "max-width:560px" }, [
+      el("div", { class: "modal-head" }, [
+        el("h3", { text: t.title }),
+        el("button", { class: "icon-btn", style: "margin-left:auto",
+                       onclick: function () { back.remove(); }, html: "&times;",
+                       "aria-label": I18N.t("btn.close") })
+      ]),
+      el("div", { class: "modal-body help-body", html: t.html })
+    ]));
+    document.body.appendChild(back);
+    function esc(e) {
+      if (e.key === "Escape") { back.remove(); document.removeEventListener("keydown", esc); }
+    }
+    document.addEventListener("keydown", esc);
+  }
+
   /* ============================================================ data input */
 
   function parseInput(text) {
@@ -2884,6 +3050,16 @@
 
     $$("[data-advise]").forEach(function (b) {
       b.onclick = function () { runAdvisor(b.dataset.advise); };
+    });
+
+    $$("[data-help]").forEach(function (b) {
+      b.onclick = function (e) {
+        // the button lives inside a <label>, so without this the click would
+        // fall through and focus the field behind the dialog
+        e.preventDefault();
+        e.stopPropagation();
+        showFieldHelp(b.dataset.help);
+      };
     });
 
     $("#kin-run").onclick = function () { runFit("kinetics"); };
