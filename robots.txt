@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nguyenducanh97.github.io/adsorpfit/sitemap.xml

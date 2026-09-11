@@ -1124,3 +1124,29 @@ table.data td .sym { white-space: nowrap; }
 }
 .interp sub, .callout sub, .advice-item sub, .help-body sub { vertical-align: -0.28em; }
 .interp sup, .callout sup, .advice-item sup, .help-body sup { vertical-align: 0.45em; }
+
+/* ---------- model index -------------------------------------------------
+   The catalogue in the Guide tab. It is written into index.html rather
+   than built by JavaScript, because a search crawler never runs Pyodide
+   and would otherwise see nothing of what this site actually does. */
+.mi-panel { max-width: 880px; margin: 22px auto 40px; }
+.mi-panel h3 {
+  margin: 26px 0 10px; font-size: 1.02rem; color: var(--accent);
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+.mi-panel > .panel-body > p { color: var(--text-2); line-height: 1.65; }
+dl.model-index { margin: 0; }
+dl.model-index dt {
+  font-weight: 600; color: var(--text); margin-top: 14px; font-size: .95rem;
+}
+dl.model-index dd {
+  margin: 3px 0 0 0; color: var(--text-2); line-height: 1.6; font-size: .88rem;
+}
+dl.model-index dd cite {
+  display: block; color: var(--text-3); font-style: normal; font-size: .8rem;
+  margin-top: 2px;
+}
+.mi-year { color: var(--text-3); font-weight: 400; font-size: .85em; }
+.mi-p { color: var(--text-3); }
+dl.model-index sub { vertical-align: -0.28em; font-size: .72em; line-height: 0; }
+dl.model-index sup { vertical-align: 0.45em; font-size: .72em; line-height: 0; }
