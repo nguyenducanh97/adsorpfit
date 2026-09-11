@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt
+from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue
 
 
 # --------------------------------------------------------------------------
@@ -868,6 +868,186 @@ CRANK = ModelSpec(
         "value, neither number is meaningful on its own — only the ratio is.",
     ],
 )
+
+
+# --------------------------------------------------------------------------
+# Domain of applicability
+# --------------------------------------------------------------------------
+
+def terminal_slope_ratio(x, y):
+    """How steeply is the curve still climbing at the end, relative to overall?
+
+    Measuring the rise over the last few points is unreliable: with only two
+    or three points in the window, even a curve that is plainly still growing
+    (q proportional to sqrt(t), say) shows a small rise and looks settled.
+    Comparing the final slope against the mean slope is the honest test,
+    because at true equilibrium the final slope goes to zero whatever the
+    sampling.  Returns ~0 at equilibrium and ~1 for a straight line.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    o = np.argsort(x)
+    x, y = x[o], y[o]
+    if x.size < 4 or x[-1] <= x[0]:
+        return 0.0
+    mean_slope = (y[-1] - y[0]) / (x[-1] - x[0])
+    if abs(mean_slope) < 1e-12:
+        return 0.0
+    # slope over the final quarter of the measured range
+    cut = x[0] + 0.75 * (x[-1] - x[0])
+    m = x >= cut
+    if m.sum() < 2:
+        m = np.zeros_like(x, bool)
+        m[-3:] = True
+    xs, ys = x[m], y[m]
+    if xs[-1] <= xs[0]:
+        return 0.0
+    final_slope = float(np.polyfit(xs, ys, 1)[0])
+    return float(abs(final_slope / mean_slope))
+
+
+def _reaches_equilibrium(x, y, ctx):
+    """Models that fit q_e need the data to actually approach equilibrium."""
+    y = np.asarray(y, float)
+    if y.size < 4:
+        return []
+    span = float(np.max(y) - np.min(y))
+    if span <= 0:
+        return []
+    ratio = terminal_slope_ratio(x, y)
+    k = max(2, y.size // 3)
+    tail = y[-k:]
+    rise = (float(np.max(tail)) - float(np.min(tail))) / span
+    if ratio > 0.15 or rise > 0.25:
+        return [issue(
+            "warn", "no_equilibrium",
+            f"Uptake is still climbing at your last time point: the slope over "
+            f"the final quarter of the run is {ratio * 100:.0f}% of the average "
+            f"slope, and the last third accounts for {rise * 100:.0f}% of the "
+            f"total change in q_t. At equilibrium both would be near zero. "
+            f"Any q_e this model reports is an extrapolation beyond the "
+            f"measured window, and the rate constant is correlated with it, so "
+            f"both numbers are soft. Run the experiment longer if q_e matters.")]
+    return []
+
+
+def _early_resolution(x, y, ctx):
+    """Rate constants are set by the early part of the curve."""
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    if y.size < 4:
+        return []
+    q_end = float(np.max(y))
+    if q_end <= 0:
+        return []
+    early = int(np.sum(y < 0.5 * q_end))
+    if early < 2:
+        return [issue(
+            "warn", "sparse_early",
+            f"Only {early} point(s) were measured before half the final uptake was "
+            f"reached. The rate constant is determined almost entirely by that "
+            f"early region, so with this sampling it is poorly constrained however "
+            f"tight the confidence interval looks. Add earlier time points.")]
+    return []
+
+
+def _elovich_domain(x, y, ctx):
+    out = _early_resolution(x, y, ctx)
+    y = np.asarray(y, float)
+    if y.size >= 4:
+        span = float(np.max(y) - np.min(y))
+        if span > 0:
+            if terminal_slope_ratio(x, y) < 0.05:
+                out.append(issue(
+                    "warn", "elovich_plateau",
+                    "Your data have clearly reached a plateau. The Elovich equation "
+                    "has no equilibrium plateau — it rises logarithmically without "
+                    "limit — so it cannot reproduce the flat region and will "
+                    "systematically overshoot at long times. It suits data still in "
+                    "the rising, chemisorption-controlled stage."))
+    return out
+
+
+def _weber_morris_validity(p, x, y, ctx):
+    """A negative intercept implies a negative loading at short times."""
+    C, kid = p.get("C", 0.0), p.get("kid", 0.0)
+    out = []
+    if C < 0 and kid > 0:
+        t_zero = (C / kid) ** 2
+        out.append(issue(
+            "warn", "wm_negative_intercept",
+            f"The fitted intercept C = {fmt(C)} mg/g is negative, so the line "
+            f"predicts a negative loading for all t below {fmt(t_zero)} min. C is "
+            f"meant to be proportional to boundary-layer thickness and cannot be "
+            f"negative physically. This is the usual sign that a single straight "
+            f"line has been forced through what are really two or three distinct "
+            f"diffusion stages — use the multi-region analysis on the Diffusion "
+            f"tab instead of this single-line fit."))
+    return out
+
+
+def _weber_morris_domain(x, y, ctx):
+    return [issue(
+        "info", "wm_single_line",
+        "Fitted here as one straight line over all points. That is almost never "
+        "the right analysis: the standard interpretation requires identifying "
+        "separate linear regions. The Diffusion tab does that segmentation and is "
+        "what you should report.")]
+
+
+def _double_exp_validity(p, x, y, ctx):
+    qe, a1 = p.get("qe", 0.0), p.get("a1", 0.0)
+    if a1 > qe:
+        return [issue(
+            "warn", "de_amplitude",
+            f"The fast-step amplitude a₁ = {fmt(a1)} mg/g exceeds the total "
+            f"capacity q_e = {fmt(qe)} mg/g, which makes the slow step's amplitude "
+            f"negative — i.e. the model is describing desorption in the second "
+            f"stage. That is rarely intended; the two exponentials are probably "
+            f"not separable in these data.")]
+    k1, k2 = p.get("k1", 0.0), p.get("k2", 0.0)
+    if k2 > 0 and 0.2 < k1 / k2 < 5:
+        return [issue(
+            "warn", "de_unseparated",
+            f"The two rate constants differ by only a factor of {fmt(k1 / k2)}. "
+            f"Two exponentials that close together are not distinguishable from a "
+            f"single one — the extra two parameters are fitting noise. Prefer the "
+            f"pseudo-first-order model unless the standard errors say otherwise.")]
+    return []
+
+
+def _crank_domain(x, y, ctx):
+    out = _reaches_equilibrium(x, y, ctx)
+    if not ctx.get("particle_radius"):
+        out.append(issue(
+            "warn", "crank_radius",
+            "D and r enter this model only as D/r², so they cannot be determined "
+            "separately. Enter your measured particle radius in the experiment "
+            "panel and treat D as the single fitted quantity; otherwise neither "
+            "number means anything on its own."))
+    return out
+
+
+def _bangham_domain(x, y, ctx):
+    if np.any(np.asarray(x) <= 0):
+        return [issue("info", "bangham_t0",
+                      "The Bangham power law is undefined at t = 0; that point is "
+                      "handled by clamping and contributes little to the fit.")]
+    return []
+
+
+for _m in (PFO, PSO, AVRAMI, MIXED_12, NTH_ORDER, RITCHIE, FRACTAL_PFO,
+           FILM_DIFFUSION):
+    _m.domain = (lambda x, y, ctx: _reaches_equilibrium(x, y, ctx)
+                 + _early_resolution(x, y, ctx))
+
+ELOVICH.domain = _elovich_domain
+WEBER_MORRIS.domain = _weber_morris_domain
+WEBER_MORRIS.validity = _weber_morris_validity
+DOUBLE_EXP.domain = _reaches_equilibrium
+DOUBLE_EXP.validity = _double_exp_validity
+CRANK.domain = _crank_domain
+BANGHAM.domain = _bangham_domain
 
 
 # --------------------------------------------------------------------------

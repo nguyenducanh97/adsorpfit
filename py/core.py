@@ -48,6 +48,17 @@ WATER_MOLARITY = 55.5        # mol / L, pure water at ~298 K
 # Declarative model description
 # --------------------------------------------------------------------------
 
+def issue(level: str, code: str, text: str) -> dict:
+    """One applicability or validity finding.
+
+    level is one of:
+        "block"  the model cannot legitimately be applied to these data
+        "warn"   it can be applied but the result needs a stated caveat
+        "info"   worth knowing, not a defect
+    """
+    return {"level": level, "code": code, "text": text}
+
+
 @dataclass
 class ParamSpec:
     """One fitted parameter of a model."""
@@ -110,6 +121,15 @@ class ModelSpec:
     requires: list[str] = field(default_factory=list)
     family: str = ""                              # e.g. "2-parameter"
     notes: str = ""
+    # domain(x, y, ctx) -> [issue]  : is this model applicable to these DATA,
+    # judged before any fitting (e.g. Temkin cannot describe dilute data).
+    domain: Callable | None = None
+    # validity(params, x, y, ctx) -> [issue] : are the FITTED parameters inside
+    # the model's own domain of definition over the measured range?
+    validity: Callable | None = None
+    # the range of x over which the model is mathematically defined, given the
+    # fitted parameters: valid_range(params, ctx) -> (lo, hi) or None
+    valid_range: Callable | None = None
 
     @property
     def n_params(self) -> int:
@@ -211,6 +231,7 @@ class FitResult:
     message: str = ""
     derived: dict = field(default_factory=dict)   # e.g. R_L, E, h
     warnings: list = field(default_factory=list)
+    issues: list = field(default_factory=list)    # applicability / validity findings
 
     def curve(self, n: int = 300, x_min=None, x_max=None):
         """Dense smooth curve for plotting."""
@@ -342,13 +363,31 @@ def fit_model(spec: ModelSpec,
             warns.append(f"{p.symbol} collapsed to zero, which usually means "
                          f"this model term is not supported by the data.")
 
+    issues = list(check_domain(spec, x, y, ctx))
+    specific = []
+    if spec.validity is not None:
+        try:
+            specific = list(spec.validity(params, x, y, ctx) or [])
+        except Exception:
+            specific = []
+    issues.extend(specific)
+    # The generic negative-prediction check is a safety net. When a model has
+    # already explained the same failure in its own terms, saying it twice just
+    # dilutes the message.
+    explained = any(i["code"].endswith("_threshold") or i["code"] == "baudu_domain"
+                    for i in specific)
+    for i in _physical_prediction_check(spec, params, x, y, y_cal, ctx):
+        if i["code"] == "negative_prediction" and explained:
+            continue
+        issues.append(i)
+
     res = FitResult(
         model_key=spec.key, model_name=spec.name, method="nonlinear",
         success=True, params=params, stderr=se, ci95=ci,
         tvalue=tval, pvalue=pval, stats=st,
         x=x, y=y, y_cal=y_cal, residuals=y - y_cal,
         message=f"converged in {best.nfev} function evaluations",
-        warnings=warns,
+        warnings=warns, issues=issues,
     )
     res._fn = lambda xv: np.asarray(model_fn(np.asarray(xv, float), theta), float)
     return res
@@ -496,6 +535,98 @@ def _evidence_phrase(delta: float) -> str:
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------
+
+def check_domain(spec: ModelSpec, x, y, ctx: dict | None = None) -> list[dict]:
+    """Applicability of a model to a dataset, judged before fitting.
+
+    Two layers: generic checks that apply to every model, then the model's
+    own ``domain`` hook.  This is what stops a model being fitted to data it
+    cannot represent - the failure mode that produces a respectable-looking
+    R^2 alongside physically impossible predictions.
+    """
+    ctx = ctx or {}
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    out: list[dict] = []
+
+    n = x.size
+    p = spec.n_params
+    if n < p:
+        out.append(issue("block", "too_few_points",
+                         f"{n} data points cannot determine {p} parameters."))
+    elif n < p + 2:
+        out.append(issue("warn", "few_points",
+                         f"Only {n} points for {p} parameters leaves {n - p} "
+                         f"degrees of freedom. The fit will look excellent "
+                         f"because it is nearly interpolating, and the "
+                         f"confidence intervals will be very wide."))
+
+    if np.any(y < 0):
+        out.append(issue("warn", "negative_y",
+                         f"{int(np.sum(y < 0))} of your q values are negative. "
+                         f"A negative uptake usually means the measured "
+                         f"equilibrium concentration exceeded the initial one - "
+                         f"check for desorption, evaporation or a calibration "
+                         f"offset before modelling."))
+    if np.any(x < 0):
+        out.append(issue("block", "negative_x",
+                         "Negative concentrations or times cannot be modelled."))
+
+    if len(np.unique(x)) < len(x):
+        out.append(issue("info", "duplicate_x",
+                         "Some x values are repeated. That is fine for replicate "
+                         "measurements, but each replicate is weighted as an "
+                         "independent point."))
+
+    if spec.domain is not None:
+        try:
+            out.extend(spec.domain(x, y, ctx) or [])
+        except Exception:
+            pass
+    return out
+
+
+def _physical_prediction_check(spec, params, x, y, y_cal, ctx) -> list[dict]:
+    """Does the fitted model predict impossible values where you measured?
+
+    A model can reach a high R^2 while predicting a negative loading at one
+    end of the range - the Temkin equation on dilute data is the standard
+    example, because it diverges to -infinity as Ce -> 0.  Nothing in the
+    least-squares objective forbids this, so it has to be checked separately.
+    """
+    out = []
+    y_cal = np.asarray(y_cal, float)
+    neg = np.asarray(y_cal < 0).sum()
+    if neg and np.all(np.asarray(y) >= 0):
+        worst = float(np.min(y_cal))
+        where = np.asarray(x)[np.argmin(y_cal)]
+        rng = spec.valid_range(params, ctx) if spec.valid_range else None
+        extra = ""
+        if rng is not None:
+            lo, hi = rng
+            if lo is not None and np.isfinite(lo):
+                extra = (f" With these parameters the model is only defined for "
+                         f"x > {fmt(lo)}; ")
+                below = int(np.sum(np.asarray(x) < lo))
+                if below:
+                    extra += f"{below} of your {len(x)} points lie below that."
+            elif hi is not None and np.isfinite(hi):
+                extra = (f" With these parameters the model is only defined for "
+                         f"x < {fmt(hi)}.")
+        out.append(issue(
+            "block", "negative_prediction",
+            f"This model predicts a NEGATIVE q of {fmt(worst)} at x = {fmt(where)}, "
+            f"which is physically impossible ({neg} of {len(x)} fitted points are "
+            f"affected).{extra} The fit statistics are therefore meaningless no "
+            f"matter how good R² looks - do not report these parameters."))
+
+    nonfinite = int(np.sum(~np.isfinite(y_cal)))
+    if nonfinite:
+        out.append(issue("block", "nonfinite_prediction",
+                         f"The model is undefined at {nonfinite} of your data "
+                         f"points, so those points contributed nothing to the fit."))
+    return out
+
 
 def _ctx_kwargs(spec: ModelSpec, ctx: dict) -> dict:
     """Pass only the context values this model actually declares."""
