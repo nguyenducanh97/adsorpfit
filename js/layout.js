@@ -18,7 +18,7 @@ const Layout = (function () {
   "use strict";
 
   const KEY = "adsorpfit-layout";
-  let state = { split: {}, collapsed: {}, order: {}, plotH: {} };
+  let state = { split: {}, collapsed: {}, order: {}, plotH: {}, panelH: {} };
 
   function load() {
     try {
@@ -158,9 +158,103 @@ const Layout = (function () {
     };
     head.appendChild(toggle);
 
+    const focus = document.createElement("button");
+    focus.className = "panel-focus-btn";
+    focus.type = "button";
+    focus.setAttribute("aria-label", "Focus this panel over the window");
+    focus.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+      'stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4"/>' +
+      "</svg>";
+    focus.onclick = function (e) { e.stopPropagation(); toggleFocus(panel); };
+    head.appendChild(focus);
+
     if (state.collapsed[key]) panel.classList.add("collapsed");
+    if (state.panelH[key]) {
+      panel.style.height = state.panelH[key] + "px";
+      panel.classList.add("sized");
+    }
 
     setupDrag(panel, grip);
+    addPanelResize(panel, key);
+  }
+
+  /* --------------------------------------------------------- focus a panel */
+
+  let focused = null;
+
+  function toggleFocus(panel) {
+    if (focused === panel) { clearFocus(); return; }
+    clearFocus();
+    focused = panel;
+    const back = document.createElement("div");
+    back.className = "focus-back";
+    back.onclick = clearFocus;
+    document.body.appendChild(back);
+    panel.classList.add("focused");
+    panel.classList.remove("collapsed");
+    document.addEventListener("keydown", escFocus);
+    resizePlots();
+  }
+
+  function escFocus(e) { if (e.key === "Escape") clearFocus(); }
+
+  function clearFocus() {
+    document.querySelectorAll(".focus-back").forEach(function (n) { n.remove(); });
+    if (focused) focused.classList.remove("focused");
+    focused = null;
+    document.removeEventListener("keydown", escFocus);
+    resizePlots();
+  }
+
+  /* ----------------------------------------------- panel bottom-edge resize */
+
+  function addPanelResize(panel, key) {
+    const h = document.createElement("div");
+    h.className = "panel-resize";
+    h.title = "Drag to set this panel's height, double-click to fit its content";
+    panel.appendChild(h);
+
+    let startY = 0, startH = 0, dragging = false;
+    function down(e) {
+      dragging = true;
+      startY = (e.touches ? e.touches[0].clientY : e.clientY);
+      startH = panel.getBoundingClientRect().height;
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    function move(e) {
+      if (!dragging) return;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY);
+      const nh = Math.max(90, startH + (y - startY));
+      panel.style.height = nh + "px";
+      panel.classList.add("sized");
+    }
+    function up() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      state.panelH[key] = Math.round(panel.getBoundingClientRect().height);
+      save();
+      resizePlots();
+    }
+    h.addEventListener("mousedown", down);
+    h.addEventListener("touchstart", down, { passive: false });
+    window.addEventListener("mousemove", move);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("mouseup", up);
+    window.addEventListener("touchend", up);
+    h.addEventListener("dblclick", function () {
+      delete state.panelH[key];
+      panel.style.height = "";
+      panel.classList.remove("sized");
+      save();
+      resizePlots();
+    });
   }
 
   /* --------------------------------------------------------- panel reorder */
@@ -196,7 +290,19 @@ const Layout = (function () {
       const y = (e.touches ? e.touches[0].clientY : e.clientY);
       panel.style.top = (y - offset) + "px";
 
-      // find the sibling whose midpoint the pointer has passed
+      // A panel can move to the other column as well as within its own, so
+      // first work out which column the pointer is currently over.
+      const x = (e.touches ? e.touches[0].clientX : e.clientX);
+      const grid = col.closest(".grid-2");
+      if (grid) {
+        const cols = grid.querySelectorAll(".col-left, .col-right");
+        for (const c of cols) {
+          const cr = c.getBoundingClientRect();
+          if (x >= cr.left && x <= cr.right) { col = c; break; }
+        }
+      }
+
+      // then the sibling whose midpoint the pointer has passed
       const sibs = Array.prototype.filter.call(col.children, function (n) {
         return n !== panel && n !== placeholder && n.classList.contains("panel");
       });
@@ -221,7 +327,9 @@ const Layout = (function () {
         placeholder.remove();
         placeholder = null;
       }
-      rememberOrder(col);
+      const grid = col.closest(".grid-2");
+      if (grid) grid.querySelectorAll(".col-left, .col-right").forEach(rememberOrder);
+      else rememberOrder(col);
       resizePlots();
     }
 
@@ -329,11 +437,15 @@ const Layout = (function () {
   }
 
   function reset() {
-    state = { split: {}, collapsed: {}, order: {}, plotH: {} };
+    state = { split: {}, collapsed: {}, order: {}, plotH: {}, panelH: {} };
     save();
     $$(".grid-2").forEach(function (g) { g.style.removeProperty("--split"); });
     $$(".panel").forEach(function (p) { p.classList.remove("collapsed"); });
     $$("[id$='-plot']").forEach(function (p) { p.style.height = ""; });
+    $$(".panel").forEach(function (p) {
+      p.style.height = ""; p.classList.remove("sized", "focused");
+    });
+    clearFocus();
     resizePlots();
   }
 
@@ -343,5 +455,6 @@ const Layout = (function () {
     window.addEventListener("resize", resizePlots);
   }
 
-  return { init: init, refresh: refresh, reset: reset, resizePlots: resizePlots };
+  return { init: init, refresh: refresh, reset: reset,
+           resizePlots: resizePlots, clearFocus: clearFocus };
 })();

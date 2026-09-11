@@ -144,23 +144,33 @@ body {
 }
 
 /* rising bubbles — a small number, cheap to animate */
+/* Each bubble takes its hue from --bub, set per element in water.js, so the
+   drift reads as a spread of water tones rather than one flat colour. The
+   highlight stays white to keep the glassy look. */
 .bubble {
   position: absolute;
   bottom: -40px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%,
-              rgba(255, 255, 255, 0.55), rgba(154, 221, 232, 0.10) 62%,
-              rgba(154, 221, 232, 0.02) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background:
+    radial-gradient(circle at 30% 26%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.30) 16%,
+      color-mix(in srgb, var(--bub, #5cc6d8) 42%, transparent) 52%,
+      color-mix(in srgb, var(--bub, #5cc6d8) 14%, transparent) 82%,
+      transparent 100%);
+  border: 1px solid color-mix(in srgb, var(--bub, #5cc6d8) 55%, transparent);
+  box-shadow:
+    inset -3px -4px 8px color-mix(in srgb, var(--bub, #5cc6d8) 30%, transparent),
+    0 0 10px color-mix(in srgb, var(--bub, #5cc6d8) 22%, transparent);
   animation: rise linear infinite;
   will-change: transform, opacity;
 }
 
 @keyframes rise {
   0%   { transform: translate3d(0, 0, 0) scale(0.65); opacity: 0; }
-  12%  { opacity: 0.42; }
+  12%  { opacity: 0.62; }
   50%  { transform: translate3d(22px, -46vh, 0) scale(1); }
-  88%  { opacity: 0.28; }
+  88%  { opacity: 0.44; }
   100% { transform: translate3d(-14px, -102vh, 0) scale(1.12); opacity: 0; }
 }
 
@@ -174,7 +184,7 @@ body {
    Layout
    ========================================================================== */
 
-.shell { max-width: 1560px; margin: 0 auto; padding: 0 26px 90px; }
+.shell { max-width: none; margin: 0; padding: 0 18px 80px; }
 
 header.masthead {
   position: sticky;
@@ -187,9 +197,9 @@ header.masthead {
 }
 
 .masthead-inner {
-  max-width: 1560px;
-  margin: 0 auto;
-  padding: 12px 26px;
+  max-width: none;
+  margin: 0;
+  padding: 11px 18px;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -239,7 +249,7 @@ nav.tabs button[aria-selected="true"] {
    Panels
    ========================================================================== */
 
-.grid-2 { display: grid; grid-template-columns: minmax(360px, 420px) 1fr; gap: 22px; align-items: start; }
+.grid-2 { display: grid; gap: 18px; align-items: start; }
 @media (max-width: 1150px) { .grid-2 { grid-template-columns: 1fr; } }
 
 .panel {
@@ -606,7 +616,7 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 :root[data-density="compact"] table.data th { padding: 5px 8px; }
 :root[data-density="compact"] .model-item { padding: 5px 8px; }
 :root[data-density="compact"] .interp li { margin-bottom: 7px; }
-:root[data-density="compact"] .shell { padding: 0 16px 60px; }
+:root[data-density="compact"] .shell { padding: 0 10px 56px; }
 
 /* --- motion ------------------------------------------------------------- */
 :root[data-motion="calm"] .wave-1 { animation-duration: 70s; opacity: .18; }
@@ -645,7 +655,7 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 
 footer.site-foot {
   border-top: 1px solid var(--border);
-  margin-top: 40px; padding: 22px 26px 40px;
+  margin-top: 36px; padding: 22px 18px 36px;
   text-align: center; font-size: 12px; color: var(--text-muted);
   background: var(--surface-glass);
 }
@@ -908,8 +918,8 @@ footer.site-foot .fl { margin-bottom: 5px; }
   border-left: 1px solid var(--border);
   flex: none;
 }
-.lab-mark img { height: 26px; width: auto; display: block; opacity: .9; }
-.lab-mark:hover img { opacity: 1; }
+.lab-mark .mark { height: 26px; opacity: .9; transition: opacity .15s; }
+.lab-mark:hover .mark { opacity: 1; }
 @media (max-width: 1080px) { .lab-mark { display: none; } }
 
 .foot-marks {
@@ -918,20 +928,87 @@ footer.site-foot .fl { margin-bottom: 5px; }
   margin-bottom: 16px; padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.foot-marks img {
-  height: 34px; width: auto; display: block;
-  opacity: .82; transition: opacity .15s;
-}
-.foot-marks a:hover img { opacity: 1; }
+.foot-marks .mark { height: 34px; opacity: .82; transition: opacity .15s; }
+.foot-marks a:hover .mark { opacity: 1; }
 
-:root[data-theme="dark"] .lab-mark img,
-:root[data-theme="dark"] .foot-marks img {
-  background: rgba(255, 255, 255, .92);
+/* The artwork is dark on transparency. On the dark theme it sits on a light
+   plate rather than being inverted, which would wreck the brand colours. */
+:root[data-theme="dark"] .lab-mark .mark,
+:root[data-theme="dark"] .foot-marks .mark {
+  background-color: rgba(255, 255, 255, .93);
   border-radius: 5px;
-  padding: 3px 7px;
+  padding: 3px 8px;
   box-sizing: content-box;
 }
-:root[data-theme="dark"] .lab-mark img { height: 22px; }
+:root[data-theme="dark"] .lab-mark .mark { height: 22px; }
 
 footer.site-foot .fl { line-height: 1.65; max-width: 780px; margin: 0 auto 2px; }
 footer.site-foot .tiny { max-width: 780px; margin-left: auto; margin-right: auto; }
+
+/* ==========================================================================
+   Toolbar buttons, focus mode and panel resizing
+   ========================================================================== */
+
+.tool-btn {
+  appearance: none; font: inherit; font-size: 12.5px; font-weight: 650;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 11px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); transition: all .15s; white-space: nowrap;
+}
+.tool-btn:hover { border-color: var(--border-strong); color: var(--text);
+                  background: var(--surface-2); }
+.tool-btn .ti { font-size: 13px; line-height: 1; opacity: .85; }
+.proj-badge {
+  max-width: 140px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-weight: 600; font-size: 11.5px;
+  padding: 1px 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ocean-600) 16%, transparent);
+  color: var(--ocean-600);
+}
+:root[data-theme="dark"] .proj-badge { color: var(--aqua-300); }
+@media (max-width: 1240px) { .tool-btn span:not(.ti):not(.proj-badge) { display: none; } }
+
+/* --- focus a single panel over the window -------------------------------- */
+
+.focus-back {
+  position: fixed; inset: 0; z-index: 130;
+  background: rgba(3, 20, 31, .55); backdrop-filter: blur(3px);
+}
+.panel.focused {
+  position: fixed; z-index: 131;
+  top: 3vh; left: 4vw; right: 4vw; bottom: 3vh;
+  margin: 0; height: auto !important;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.panel.focused > .panel-body { flex: 1; overflow-y: auto; }
+.panel.focused .panel-resize { display: none; }
+
+.panel-focus-btn {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); width: 24px; height: 24px; flex: none;
+  display: grid; place-items: center; border-radius: 6px; margin-left: 2px;
+  transition: background .15s, color .15s;
+}
+.panel-focus-btn:hover { background: var(--foam-100); color: var(--text); }
+
+/* --- panel bottom-edge resize -------------------------------------------- */
+
+.panel { position: relative; }
+.panel.sized { overflow: hidden; display: flex; flex-direction: column; }
+.panel.sized > .panel-body { flex: 1; overflow-y: auto; }
+
+.panel-resize {
+  height: 9px; flex: none; cursor: row-resize; position: relative;
+  border-top: 1px solid transparent; transition: background .15s;
+}
+.panel-resize::before {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 34px; height: 0; transform: translate(-50%, -50%);
+  border-top: 2px dotted var(--border-strong);
+  transition: border-color .15s, width .15s;
+}
+.panel-resize:hover { background: color-mix(in srgb, var(--ocean-600) 8%, transparent); }
+.panel-resize:hover::before { border-color: var(--ocean-600); width: 60px; }
+.panel.collapsed .panel-resize { display: none; }

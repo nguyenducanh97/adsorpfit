@@ -28,7 +28,7 @@ the machine: there is no server and no upload.
 | **Tables** | CSV, TSV, XLSX, Markdown, LaTeX, HTML, JSON; plus curve data and a complete HTML report |
 | **Model advisor** | Reads the shape of your raw data, does it plateau? is it linear, sigmoidal? did the kinetics equilibrate?, then screens every model and sorts them into recommended / usable / not advised, each with a reason |
 | **Domain checking** | Every model is tested against its own range of validity before and after fitting, so a model cannot be reported from data it mathematically cannot describe |
-| **Layout** | Drag the bar between the columns to resize them, drag a panel by its header grip to reorder it, collapse any panel from its header, and drag the grip under a figure to change its height. All of it persists. |
+| **Layout** | Drag the divider between the columns; drag a panel by its header grip to move it within a column or across to the other one; drag the dotted handle along a panel's bottom edge to set its height; collapse with the chevron; blow one panel up over the window with the focus button (Esc returns). All of it persists, with `Reset layout` in the toolbar. |
 | **Workspace** | English and Korean, light / dark / system theme, three background-motion levels, three layout arrangements, two densities, and named projects saved in the browser with export and import |
 
 ---
@@ -181,8 +181,10 @@ Branch: `main`, folder: `/ (root)` → Save**. The site appears at
 ```
 adsorpfit/
 ├── index.html              app shell
-├── assets/                 SWAT, SKKU and U-TOP marks
-├── css/style.css           styling, water background, light and dark themes
+├── assets/                 SWAT, SKKU and U-TOP marks (source PNGs)
+├── css/
+│   ├── marks.css           the three institutional logos, inlined as data URIs
+│   └── style.css           styling, water background, light and dark themes
 ├── js/
 │   ├── i18n.js             English / Korean dictionary and switching
 │   ├── prefs.js            theme, motion, layout, density + project storage

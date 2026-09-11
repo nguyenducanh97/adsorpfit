@@ -2528,6 +2528,19 @@
     $("#th-results").innerHTML = "";
   }
 
+  // Show which project is open, so saving over the right one is obvious.
+  function refreshProjectBadge() {
+    const b = $("#proj-current");
+    if (!b) return;
+    if (STATE.projectName) {
+      b.textContent = STATE.projectName;
+      b.classList.remove("hidden");
+    } else {
+      b.textContent = "";
+      b.classList.add("hidden");
+    }
+  }
+
   function openProjects() {
     openDrawer(I18N.t("proj.title"), function (body) {
       const nameInput = el("input", { type: "text",
@@ -2551,6 +2564,7 @@
             STATE.projectId = rec.id;
             STATE.projectName = rec.name;
             toast(I18N.t("proj.saved"), "good");
+            refreshProjectBadge();
             closeDrawer(); openProjects();
           } }),
         el("button", { class: "btn sm", text: I18N.t("proj.saveAs"),
@@ -2561,6 +2575,7 @@
             if (rec) {
               STATE.projectId = rec.id; STATE.projectName = rec.name;
               toast(I18N.t("proj.saved"), "good");
+            refreshProjectBadge();
               closeDrawer(); openProjects();
             }
           } })
@@ -2590,6 +2605,7 @@
               onclick: function () {
                 restore(p.payload);
                 STATE.projectId = p.id; STATE.projectName = p.name;
+                refreshProjectBadge();
                 toast(I18N.t("proj.loaded"), "good");
                 closeDrawer();
               } }),
@@ -2598,7 +2614,10 @@
                 const nm = prompt(I18N.t("proj.name"), p.name);
                 if (nm && nm.trim()) {
                   Projects.rename(p.id, nm.trim());
-                  if (STATE.projectId === p.id) STATE.projectName = nm.trim();
+                  if (STATE.projectId === p.id) {
+                    STATE.projectName = nm.trim();
+                    refreshProjectBadge();
+                  }
                   closeDrawer(); openProjects();
                 }
               } }),
@@ -2608,6 +2627,7 @@
                 Projects.remove(p.id);
                 if (STATE.projectId === p.id) {
                   STATE.projectId = null; STATE.projectName = "";
+                  refreshProjectBadge();
                 }
                 toast(I18N.t("proj.deleted"), "good");
                 closeDrawer(); openProjects();
@@ -2714,6 +2734,10 @@
 
     $("#settings-btn").onclick = openSettings;
     $("#projects-btn").onclick = openProjects;
+    $("#resetlayout-btn").onclick = function () {
+      Layout.reset();
+      toast(I18N.t("set.layoutReset"), "good");
+    };
 
     const ls = $("#lang-switch");
     I18N.languages.forEach(function (l) {
