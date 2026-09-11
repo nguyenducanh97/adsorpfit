@@ -213,7 +213,11 @@ def check_hygiene():
 
 def check_external():
     html = read("index.html")
-    hosts = sorted(set(re.findall(r'(?:src|href)="https://([^/"]+)', html)))
+    # The canonical link and the og: tags have to be absolute, so the site's
+    # own origin appears here. It is not a third party.
+    OWN = "nguyenducanh97.github.io"
+    hosts = sorted(set(re.findall(r'(?:src|href)="https://([^/"]+)', html))
+                   - {OWN})
     add("INFO", "network", "third-party hosts: %s" % ", ".join(hosts))
     for h in hosts:
         if h not in ("cdn.jsdelivr.net", "cdn.plot.ly", "fonts.googleapis.com",
@@ -272,11 +276,59 @@ def check_accessibility():
 
 
 # --------------------------------------------------------------------------
+def check_seo():
+    """Can a search engine see what this site is, without running Pyodide?"""
+    html = read("index.html")
+
+    for tag, what in ((r'<link rel="canonical"', "canonical link"),
+                      (r'property="og:image"', "og:image"),
+                      (r'property="og:description"', "og:description"),
+                      (r'type="application/ld\+json"', "structured data")):
+        if not re.search(tag, html):
+            add("ERROR", "seo", "index.html has no %s" % what)
+
+    for f in ("robots.txt", "sitemap.xml", "assets/og-card.png"):
+        if not os.path.isfile(f):
+            add("ERROR", "seo", "%s is missing" % f)
+
+    # the structured data must be parseable, or Google silently drops it
+    m = re.search(r'<script type="application/ld\+json">(.*?)</script>',
+                  html, re.S)
+    if m:
+        try:
+            json.loads(m.group(1))
+            add("OK", "seo", "structured data parses as JSON-LD")
+        except Exception as exc:
+            add("ERROR", "seo", "structured data is not valid JSON: %s" % exc)
+
+    # the crawlable model catalogue must still match the model specs
+    sys.path.insert(0, "tools")
+    try:
+        import make_seo
+        if make_seo.splice(html, make_seo.block()) != html:
+            add("ERROR", "seo",
+                "the model catalogue in index.html is stale, "
+                "run python tools/make_seo.py")
+        else:
+            add("OK", "seo", "model catalogue in index.html matches the specs")
+    except Exception as exc:
+        add("WARN", "seo", "could not verify the model catalogue: %s" % exc)
+
+    body = html.split("<body>", 1)[-1]
+    body = re.sub(r"<script.*?</script>", "", body, flags=re.S)
+    body = re.sub(r"<svg.*?</svg>", "", body, flags=re.S)
+    words = len(re.sub(r"<[^>]+>", " ", body).split())
+    if words < 1200:
+        add("WARN", "seo", "only %d crawlable words on the page" % words)
+    else:
+        add("OK", "seo", "%d words of text a crawler can read" % words)
+
+
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     for fn in (check_i18n, check_models, check_presets, check_assets,
                check_cache_busting, check_hygiene, check_external,
-               check_notation, check_licence, check_accessibility):
+               check_notation, check_licence, check_accessibility, check_seo):
         try:
             fn()
         except Exception as exc:

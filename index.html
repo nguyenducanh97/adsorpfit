@@ -5,16 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AdsorpFit: Adsorption Kinetics, Isotherm & Thermodynamic Fitting</title>
 <meta name="description" content="Free browser-based fitting of adsorption kinetics, isotherm and thermodynamic data. 34 models, non-linear regression, publication-quality figures and automatic interpretation of every parameter. A product of SWAT Lab and UTOP.">
+<meta name="keywords" content="adsorption isotherm fitting, adsorption kinetics fitting, Langmuir, Freundlich, Sips, Redlich-Peterson, Temkin, pseudo-first-order, pseudo-second-order, Elovich, Avrami, intraparticle diffusion, van 't Hoff, thermodynamic parameters, adsorption calculator, non-linear regression">
+<meta name="author" content="Nguyen Duc Anh, SWAT Lab, Sungkyunkwan University">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#37c8cf">
+<link rel="canonical" href="https://nguyenducanh97.github.io/adsorpfit/">
+
+<!-- Link previews, and what a crawler quotes back in a result card. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AdsorpFit">
+<meta property="og:url" content="https://nguyenducanh97.github.io/adsorpfit/">
+<meta property="og:title" content="AdsorpFit: Adsorption Kinetics, Isotherm &amp; Thermodynamic Fitting">
+<meta property="og:description" content="Fit 21 isotherm models, 13 kinetic models and van 't Hoff thermodynamics to your own adsorption data, free and entirely in your browser. Nothing is uploaded.">
+<meta property="og:image" content="https://nguyenducanh97.github.io/adsorpfit/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="AdsorpFit, showing a Langmuir isotherm fitted to phosphate uptake data">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AdsorpFit: adsorption data fitting in your browser">
+<meta name="twitter:description" content="21 isotherm models, 13 kinetic models, van 't Hoff thermodynamics, publication-quality figures. Free and open source.">
+<meta name="twitter:image" content="https://nguyenducanh97.github.io/adsorpfit/assets/og-card.png">
+
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<link rel="stylesheet" href="css/marks.css?v=25">
-<link rel="stylesheet" href="css/style.css?v=25">
+<link rel="stylesheet" href="css/marks.css?v=26">
+<link rel="stylesheet" href="css/style.css?v=26">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+<!-- Structured data. Every claim here is one the site actually meets:
+     it is free, it needs no account, and it runs in the browser. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AdsorpFit",
+  "url": "https://nguyenducanh97.github.io/adsorpfit/",
+  "applicationCategory": "ScienceApplication",
+  "applicationSubCategory": "Adsorption data analysis",
+  "operatingSystem": "Any, runs in a web browser",
+  "browserRequirements": "Requires WebAssembly, supported by current Chrome, Firefox, Edge and Safari",
+  "description": "AdsorpFit fits 21 adsorption isotherm models and 13 adsorption kinetic models to measured data by bounded non-linear least squares, ranks them by AICc, checks that the data lie inside each model's valid domain, derives van 't Hoff thermodynamic parameters, and explains every fitted parameter in writing. All computation runs locally in the browser.",
+  "inLanguage": ["en", "ko"],
+  "isAccessibleForFree": true,
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "featureList": [
+    "21 adsorption isotherm models including Langmuir, Freundlich, Sips, Toth, Redlich-Peterson, Temkin and Dubinin-Radushkevich",
+    "13 adsorption kinetic models including pseudo-first-order, pseudo-second-order, Elovich, Avrami and intraparticle diffusion",
+    "van 't Hoff thermodynamics with six documented routes to a dimensionless equilibrium constant",
+    "Parameter standard errors, 95 percent confidence intervals and AICc model ranking",
+    "Automatic model recommendation from the shape of the data",
+    "Publication-quality figures exportable as PNG, PDF, SVG, EPS and TIFF"
+  ],
+  "creator": {
+    "@type": "Person",
+    "name": "Nguyen Duc Anh",
+    "email": "nguyenducanh@g.skku.edu",
+    "affiliation": {
+      "@type": "Organization",
+      "name": "SWAT Lab, Sustainable Water Treatment Laboratory",
+      "url": "http://www.swatlab.or.kr/",
+      "parentOrganization": {
+        "@type": "CollegeOrUniversity",
+        "name": "Sungkyunkwan University",
+        "url": "https://www.skku.edu/"
+      }
+    }
+  }
+}
+</script>
 </head>
 <body>
 
@@ -389,6 +459,109 @@
       <div class="panel-head"><h2>How to use AdsorpFit: and how to read what it tells you</h2></div>
       <div class="panel-body" id="guide-body"></div>
     </div>
+<!-- SEO:MODELS start, generated by tools/make_seo.py -->
+    <div class="panel mi-panel" id="model-index">
+      <div class="panel-head"><h2>Every model AdsorpFit can fit</h2></div>
+      <div class="panel-body">
+        <p>AdsorpFit fits 21 adsorption isotherm models and 13 adsorption kinetic
+        models to your own measurements, then runs a full van 't Hoff
+        thermodynamic analysis, entirely inside your browser. Fitting is by
+        bounded non-linear least squares, with linearised forms offered
+        alongside for comparison. Every fit returns parameter standard errors,
+        95% confidence intervals, AICc ranking against the other models you
+        selected, checks that the data actually fall inside the model's valid
+        domain, and a written interpretation of what the numbers mean. Nothing
+        you paste is uploaded anywhere.</p>
+
+        <h3>Adsorption isotherm models (21)</h3>
+        <dl class="model-index">
+          <dt id="model-langmuir">Langmuir <span class="mi-year">1918</span></dt>
+          <dd>Adsorption is confined to a monolayer, with no stacking of adsorbate. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>L</sub>.</span> <cite>Langmuir, I. (1918) J. Am. Chem. Soc. 40, 1361-1403.</cite></dd>
+          <dt id="model-freundlich">Freundlich <span class="mi-year">1906</span></dt>
+          <dd>The surface is energetically heterogeneous, with an exponential distribution of site energies. <span class="mi-p">Fitted parameters: K<sub>F</sub>, n.</span> <cite>Freundlich, H.M.F. (1906) Z. Phys. Chem. 57, 385-470.</cite></dd>
+          <dt id="model-temkin">Temkin <span class="mi-year">1940</span></dt>
+          <dd>The heat of adsorption of all molecules in the layer decreases linearly with surface coverage, because of adsorbate–adsorbate repulsion. <span class="mi-p">Fitted parameters: A<sub>T</sub>, b<sub>T</sub>.</span> <cite>Temkin, M.J. &amp; Pyzhev, V. (1940) Acta Physiochim. URSS 12, 217-222.</cite></dd>
+          <dt id="model-dubinin-radushkevich">Dubinin–Radushkevich <span class="mi-year">1947</span></dt>
+          <dd>Adsorption proceeds by pore filling rather than layer-by-layer coverage. <span class="mi-p">Fitted parameters: q<sub>s</sub>, K<sub>ad</sub>.</span> <cite>Dubinin, M.M. &amp; Radushkevich, L.V. (1947) Proc. Acad. Sci. USSR 55, 331-337.</cite></dd>
+          <dt id="model-jovanovic">Jovanović <span class="mi-year">1969</span></dt>
+          <dd>Monolayer coverage as in Langmuir, but allowing for mechanical contact between adsorbing and desorbing molecules. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>J</sub>.</span> <cite>Jovanović, D.S. (1969) Kolloid-Z. Z. Polym. 235, 1203-1214.</cite></dd>
+          <dt id="model-halsey">Halsey <span class="mi-year">1948</span></dt>
+          <dd>Describes multilayer adsorption at a relatively large distance from the surface. <span class="mi-p">Fitted parameters: K<sub>H</sub>, n<sub>H</sub>.</span> <cite>Halsey, G. (1948) J. Chem. Phys. 16, 931-937.</cite></dd>
+          <dt id="model-harkins-jura">Harkins–Jura <span class="mi-year">1944</span></dt>
+          <dd>Multilayer adsorption on a heterogeneous pore distribution. <span class="mi-p">Fitted parameters: A, B.</span> <cite>Harkins, W.D. &amp; Jura, G. (1944) J. Chem. Phys. 12, 112-113.</cite></dd>
+          <dt id="model-bet">BET (liquid phase) <span class="mi-year">1938</span></dt>
+          <dd>Multilayer adsorption: molecules adsorb on top of already-adsorbed molecules. <span class="mi-p">Fitted parameters: q<sub>s</sub>, C<sub>BET</sub>.</span> <cite>Brunauer, S., Emmett, P.H. &amp; Teller, E. (1938) J. Am. Chem. Soc. 60, 309-319.</cite></dd>
+          <dt id="model-elovich-isotherm">Elovich (isotherm) <span class="mi-year">1962</span></dt>
+          <dd>Adsorption sites increase exponentially with coverage, implying multilayer adsorption. <span class="mi-p">Fitted parameters: q<sub>m</sub>, K<sub>E</sub>.</span> <cite>Elovich, S.Y. &amp; Larinov, O.G. (1962) Izv. Akad. Nauk. SSSR, Otd. Khim. Nauk 2, 209-216.</cite></dd>
+          <dt id="model-sips">Sips (Langmuir–Freundlich) <span class="mi-year">1948</span></dt>
+          <dd>A hybrid of Langmuir and Freundlich: Freundlich-like at low Ce, Langmuir-like at high Ce. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>s</sub>, m<sub>s</sub>.</span> <cite>Sips, R. (1948) J. Chem. Phys. 16, 490-495.</cite></dd>
+          <dt id="model-toth">Tóth <span class="mi-year">1971</span></dt>
+          <dd>Derived from potential theory for heterogeneous adsorption. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>T</sub>, n<sub>T</sub>.</span> <cite>Tóth, J. (1971) Acta Chim. Acad. Sci. Hung. 69, 311-328.</cite></dd>
+          <dt id="model-redlich-peterson">Redlich–Peterson <span class="mi-year">1959</span></dt>
+          <dd>An empirical hybrid of Langmuir and Freundlich. <span class="mi-p">Fitted parameters: K<sub>RP</sub>, a<sub>RP</sub>, g.</span> <cite>Redlich, O. &amp; Peterson, D.L. (1959) J. Phys. Chem. 63, 1024-1026.</cite></dd>
+          <dt id="model-khan">Khan <span class="mi-year">1996</span></dt>
+          <dd>A general model for pure solutions, intended for multi-component systems. <span class="mi-p">Fitted parameters: q<sub>max</sub>, b<sub>K</sub>, a<sub>K</sub>.</span> <cite>Khan, A.R., Al-Waheab, I.R. &amp; Al-Haddad, A. (1996) Environ. Technol. 17, 13-23.</cite></dd>
+          <dt id="model-radke-prausnitz">Radke–Prausnitz <span class="mi-year">1972</span></dt>
+          <dd>Performs particularly well at dilute concentrations, its original purpose. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>RP</sub>, m<sub>RP</sub>.</span> <cite>Radke, C.J. &amp; Prausnitz, J.M. (1972) Ind. Eng. Chem. Fundam. 11, 445-451.</cite></dd>
+          <dt id="model-hill">Hill <span class="mi-year">1910</span></dt>
+          <dd>Derived for binding of a ligand to a homogeneous substrate. <span class="mi-p">Fitted parameters: q<sub>SH</sub>, K<sub>D</sub>, n<sub>H</sub>.</span> <cite>Hill, A.V. (1910) J. Physiol. 40, iv-vii.</cite></dd>
+          <dt id="model-koble-corrigan">Koble–Corrigan <span class="mi-year">1952</span></dt>
+          <dd>An empirical combination of the Langmuir and Freundlich forms. <span class="mi-p">Fitted parameters: A, B, n.</span> <cite>Koble, R.A. &amp; Corrigan, T.E. (1952) Ind. Eng. Chem. 44, 383-387.</cite></dd>
+          <dt id="model-brouers-sotolongo">Brouers–Sotolongo (deformed Weibull) <span class="mi-year">2005</span></dt>
+          <dd>Derived from a statistical distribution of adsorption energies (a deformed exponential / Weibull form). <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>BS</sub>, α.</span> <cite>Brouers, F. et al. (2005) J. Hazard. Mater. 138, 591-597.</cite></dd>
+          <dt id="model-vieth-sladek">Vieth–Sladek <span class="mi-year">1965</span></dt>
+          <dd>Two populations of adsorbate coexist: one dissolved into the solid following Henry's law, one bound to discrete sites following Langmuir. <span class="mi-p">Fitted parameters: k<sub>VS</sub>, q<sub>max</sub>, b.</span> <cite>Vieth, W.R. &amp; Sladek, K.J. (1965) J. Colloid Sci. 20, 1014-1033.</cite></dd>
+          <dt id="model-fritz-schlunder">Fritz–Schlünder (IV) <span class="mi-year">1974</span></dt>
+          <dd>A flexible empirical equation with no single mechanistic derivation. <span class="mi-p">Fitted parameters: A, B, α, β.</span> <cite>Fritz, W. &amp; Schlünder, E.U. (1974) Chem. Eng. Sci. 29, 1279-1282.</cite></dd>
+          <dt id="model-baudu">Baudu <span class="mi-year">1990</span></dt>
+          <dd>An extension of Langmuir in which the affinity b<sub>0</sub> is itself allowed to vary with coverage. <span class="mi-p">Fitted parameters: q<sub>max</sub>, b<sub>0</sub>, x, y.</span> <cite>Baudu, M. (1990) PhD thesis, Université de Rennes; see Limousin, G. et al. (2007) Appl. Geochem. 22, 249-275.</cite></dd>
+          <dt id="model-marczewski-jaroniec">Marczewski–Jaroniec <span class="mi-year">1983</span></dt>
+          <dd>Derived from a generalised (quasi-Gaussian) distribution of adsorption energies, with m and n controlling each tail independently. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K, m, n.</span> <cite>Marczewski, A.W. &amp; Jaroniec, M. (1983) Monatsh. Chem. 114, 711-715.</cite></dd>
+        </dl>
+
+        <h3>Adsorption kinetic models (13)</h3>
+        <dl class="model-index">
+          <dt id="model-pfo">Pseudo-first-order (Lagergren) <span class="mi-year">1898</span></dt>
+          <dd>The uptake rate is proportional to the number of unoccupied sites, d q<sub>t</sub>/dt = k<sub>1</sub>(q<sub>e</sub> − q<sub>t</sub>). <span class="mi-p">Fitted parameters: q<sub>e,cal</sub>, k<sub>1</sub>.</span> <cite>Lagergren, S. (1898) Kungliga Svenska Vetenskapsakademiens Handlingar 24, 1-39.</cite></dd>
+          <dt id="model-pso">Pseudo-second-order (Ho &amp; McKay) <span class="mi-year">1999</span></dt>
+          <dd>The uptake rate is proportional to the square of the number of unoccupied sites, d q<sub>t</sub>/dt = k<sub>2</sub>(q<sub>e</sub> − q<sub>t</sub>)<sup>2</sup>. <span class="mi-p">Fitted parameters: q<sub>e,cal</sub>, k<sub>2</sub>.</span> <cite>Ho, Y.S. &amp; McKay, G. (1999) Process Biochem. 34, 451-465.</cite></dd>
+          <dt id="model-elovich">Elovich <span class="mi-year">1934</span></dt>
+          <dd>The activation energy for adsorption increases linearly with coverage. <span class="mi-p">Fitted parameters: α, β.</span> <cite>Roginsky, S. &amp; Zeldovich, Y.B. (1934) Acta Physicochim. URSS 1, 554-594; Chien, S.H. &amp; Clayton, W.R. (1980) Soil Sci. Soc. Am. J. 44, 265-268.</cite></dd>
+          <dt id="model-avrami">Avrami (fractional order) <span class="mi-year">1940</span></dt>
+          <dd>Adapted from nucleation and crystal-growth theory. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>AV</sub>, n<sub>AV</sub>.</span> <cite>Avrami, M. (1940) J. Chem. Phys. 8, 212-224; Lopes, E.C.N. et al. (2003) J. Colloid Interface Sci. 263, 542-547.</cite></dd>
+          <dt id="model-mixed-1-2">Mixed 1,2-order (MOE) <span class="mi-year">2010</span></dt>
+          <dd>Interpolates continuously between PFO and PSO rather than forcing a choice between them. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>MOE</sub>, f<sub>2</sub>.</span> <cite>Marczewski, A.W. (2010) Langmuir 26, 15229-15238.</cite></dd>
+          <dt id="model-nth-order">Pseudo-nth-order <span class="mi-year">2007</span></dt>
+          <dd>Generalises PFO and PSO by letting the order n be fitted. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>n</sub>, n.</span> <cite>Özer, A. (2007) J. Hazard. Mater. 141, 753-761.</cite></dd>
+          <dt id="model-ritchie">Ritchie nth-order <span class="mi-year">1977</span></dt>
+          <dd>Derived from the fraction of surface sites occupied, not from a concentration-driven rate law. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>R</sub>, n.</span> <cite>Ritchie, A.G. (1977) J. Chem. Soc. Faraday Trans. 1 73, 1650-1653.</cite></dd>
+          <dt id="model-fractal-pfo">Fractal-like pseudo-first-order <span class="mi-year">2012</span></dt>
+          <dd>The rate 'constant' is not constant: on a fractal or energetically disordered surface it decays as a power of time, k(t) = k′t^(−h). <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>1</sub>', h.</span> <cite>Kopelman, R. (1988) Science 241, 1620-1626; Haerifar, M. &amp; Azizian, S. (2012) J. Phys. Chem. C 116, 13111-13119.</cite></dd>
+          <dt id="model-weber-morris">Weber–Morris (intraparticle diffusion) <span class="mi-year">1963</span></dt>
+          <dd>Uptake varies with the square root of time when intraparticle diffusion controls the rate. <span class="mi-p">Fitted parameters: k<sub>id</sub>, C.</span> <cite>Weber, W.J. &amp; Morris, J.C. (1963) J. Sanit. Eng. Div. ASCE 89, 31-60.</cite></dd>
+          <dt id="model-film-diffusion">Liquid film diffusion (Boyd–Adamson) <span class="mi-year">1947</span></dt>
+          <dd>The rate is controlled by diffusion of adsorbate across the stagnant liquid film around the adsorbent particle. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>fd</sub>.</span> <cite>Boyd, G.E., Adamson, A.W. &amp; Myers, L.S. (1947) J. Am. Chem. Soc. 69, 2836-2848.</cite></dd>
+          <dt id="model-bangham">Bangham (pore diffusion) <span class="mi-year">1924</span></dt>
+          <dd>Pore diffusion is the rate-controlling step. <span class="mi-p">Fitted parameters: k<sub>0</sub>, α.</span> <cite>Bangham, D.H. &amp; Burt, F.P. (1924) Proc. R. Soc. Lond. A 105, 481-488.</cite></dd>
+          <dt id="model-crank">Homogeneous surface diffusion (Crank) <span class="mi-year">1975</span></dt>
+          <dd>Spherical, homogeneous particles of uniform radius r. <span class="mi-p">Fitted parameters: q<sub>e</sub>, D, r.</span> <cite>Crank, J. (1975) The Mathematics of Diffusion, 2nd ed., Oxford.</cite></dd>
+          <dt id="model-double-exponential">Double exponential <span class="mi-year">1993</span></dt>
+          <dd>Adsorption proceeds in two parallel or sequential steps with distinct rate constants: typically a fast external surface step and a slow internal diffusion step. <span class="mi-p">Fitted parameters: q<sub>e</sub>, a<sub>1</sub>, k<sub>D1</sub>, k<sub>D2</sub>.</span> <cite>Wilczak, A. &amp; Keinath, T.M. (1993) Water Environ. Res. 65, 238-244.</cite></dd>
+        </dl>
+
+        <h3>Adsorption thermodynamics</h3>
+        <p>From isotherms measured at three or more temperatures, AdsorpFit
+        derives the standard Gibbs free energy change, the standard enthalpy
+        change and the standard entropy change by the van 't Hoff method, using
+        a genuinely dimensionless equilibrium constant. Six documented routes to
+        that dimensionless constant are offered, because a van 't Hoff plot
+        built on a constant that still carries units is the single most common
+        error in the adsorption literature. Isosteric heat of adsorption as a
+        function of surface loading, Arrhenius activation energy from fitted
+        rate constants, and sticking probability are also available.</p>
+      </div>
+    </div>
+<!-- SEO:MODELS end -->
   </section>
 </main>
 
@@ -426,13 +599,13 @@
 <!-- Bump APP_VERSION on every release. The ?v= query is what forces
      browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
      than serving a cached copy. -->
-<script>window.APP_VERSION = "25";</script>
-<script src="js/i18n.js?v=25"></script>
-<script src="js/prefs.js?v=25"></script>
-<script src="js/presets.js?v=25"></script>
-<script src="js/layout.js?v=25"></script>
-<script src="js/water.js?v=25"></script>
-<script src="js/plot.js?v=25"></script>
-<script src="js/app.js?v=25"></script>
+<script>window.APP_VERSION = "26";</script>
+<script src="js/i18n.js?v=26"></script>
+<script src="js/prefs.js?v=26"></script>
+<script src="js/presets.js?v=26"></script>
+<script src="js/layout.js?v=26"></script>
+<script src="js/water.js?v=26"></script>
+<script src="js/plot.js?v=26"></script>
+<script src="js/app.js?v=26"></script>
 </body>
 </html>
