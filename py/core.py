@@ -417,7 +417,21 @@ def fit_linear(spec: ModelSpec, form: LinearForm,
                                    "valid points (log or reciprocal of a "
                                    "non-positive value).")
 
-    lr = sps.linregress(xs[ok], ys[ok])
+    # A transform can collapse the x axis to a single value (the Scatchard
+    # form of Langmuir does exactly that on flat data), and SciPy raises
+    # rather than returning a degenerate line. Catch it here: one unusable
+    # linearisation must not take down the whole request.
+    if np.ptp(xs[ok]) == 0:
+        return _failed(spec, x, y,
+                       f"The {form.name} transform maps every point to the same "
+                       f"x value, so no line can be fitted through them. This "
+                       f"happens when the data are flat; the non-linear fit is "
+                       f"unaffected.")
+    try:
+        lr = sps.linregress(xs[ok], ys[ok])
+    except Exception as exc:
+        return _failed(spec, x, y,
+                       f"The {form.name} linearisation could not be fitted: {exc}")
     try:
         params = form.recover(lr.slope, lr.intercept, ctx)
     except Exception as exc:
@@ -535,6 +549,38 @@ def _evidence_phrase(delta: float) -> str:
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------
+
+def terminal_slope_ratio(x, y):
+    """How steeply is the curve still climbing at the end, relative to overall?
+
+    Measuring the rise over the last few points is unreliable: with only two
+    or three points in the window, even a curve that is plainly still growing
+    (q proportional to sqrt(t), say) shows a small rise and looks settled.
+    Comparing the final slope against the mean slope is the honest test,
+    because at true equilibrium the final slope goes to zero whatever the
+    sampling.  Returns ~0 at equilibrium and ~1 for a straight line.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    o = np.argsort(x)
+    x, y = x[o], y[o]
+    if x.size < 4 or x[-1] <= x[0]:
+        return 0.0
+    mean_slope = (y[-1] - y[0]) / (x[-1] - x[0])
+    if abs(mean_slope) < 1e-12:
+        return 0.0
+    # slope over the final quarter of the measured range
+    cut = x[0] + 0.75 * (x[-1] - x[0])
+    m = x >= cut
+    if m.sum() < 2:
+        m = np.zeros_like(x, bool)
+        m[-3:] = True
+    xs, ys = x[m], y[m]
+    if xs[-1] <= xs[0]:
+        return 0.0
+    final_slope = float(np.polyfit(xs, ys, 1)[0])
+    return float(abs(final_slope / mean_slope))
+
 
 def check_domain(spec: ModelSpec, x, y, ctx: dict | None = None) -> list[dict]:
     """Applicability of a model to a dataset, judged before fitting.

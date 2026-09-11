@@ -44,6 +44,8 @@ const I18N = (function () {
       "sub.export": "Export",
 
       "btn.example": "Load example",
+      "preset.choose": "Example datasets…",
+      "preset.loaded": "Example loaded. Press Fit models.",
       "btn.clear": "Clear",
       "btn.upload": "Upload CSV",
       "btn.fit": "Fit models",
@@ -231,6 +233,8 @@ const I18N = (function () {
       "sub.export": "내보내기",
 
       "btn.example": "예제 불러오기",
+      "preset.choose": "예제 데이터…",
+      "preset.loaded": "예제를 불러왔습니다. 모델 피팅을 누르세요.",
       "btn.clear": "지우기",
       "btn.upload": "CSV 업로드",
       "btn.fit": "모델 피팅",

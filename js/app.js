@@ -198,6 +198,7 @@
 
       buildModelPicker("kinetics");
       buildModelPicker("isotherm");
+      buildPresetPickers();
       buildThermoControls();
       buildGuide();
 
@@ -303,6 +304,66 @@
       body
     ]));
     document.body.appendChild(back);
+  }
+
+  /* ============================================================== presets */
+
+  // Built-in example datasets. Each carries its citation, which is shown
+  // beneath the picker once one is loaded: these are other people's
+  // measurements and should travel with their attribution.
+  function buildPresetPickers() {
+    $$("[data-preset]").forEach(function (sel) {
+      const cat = sel.dataset.preset;
+      sel.innerHTML = "";
+      sel.appendChild(el("option", { value: "",
+                                     text: I18N.t("preset.choose") }));
+      PRESETS.filter(function (p) {
+        return p.cat === (cat === "kinetics" ? "kinetics" : "isotherm");
+      }).forEach(function (p) {
+        const t = p[I18N.get()] || p.en;
+        sel.appendChild(el("option", { value: p.id, text: t.name }));
+      });
+      sel.onchange = function () {
+        if (sel.value) loadPreset(cat, sel.value);
+      };
+    });
+  }
+
+  function loadPreset(cat, id) {
+    const p = PRESETS.find(function (x) { return x.id === id; });
+    if (!p) return;
+    const t = p[I18N.get()] || p.en;
+    const pref = cat === "kinetics" ? "kin" : "iso";
+
+    $("#" + pref + "-data").value = p.data;
+    Object.keys(p.ctx || {}).forEach(function (k) {
+      const n = $("#" + pref + "-" + k);
+      if (n) n.value = p.ctx[k];
+    });
+    if (p.models) {
+      $$("#" + pref + "-models input[type=checkbox]").forEach(function (c) {
+        c.checked = p.models.indexOf(c.value) >= 0;
+      });
+    }
+    readData(cat);
+
+    STATE[cat].fit = null;
+    STATE[cat].advice = null;
+    STATE[cat].frames = null;
+    STATE[cat].traceStyle = null;
+    $("#" + pref + "-results").innerHTML = "";
+    renderAdvice(cat);
+
+    // attribution sits under the picker, not in a toast that disappears
+    const host = $("#" + pref + "-data").closest(".panel-body");
+    let cite = $(".preset-cite", host);
+    if (!cite) {
+      cite = el("div", { class: "preset-cite" });
+      host.appendChild(cite);
+    }
+    cite.innerHTML = "<b>" + md(t.name) + ".</b> " + md(t.note) +
+                     "<span class='src'>" + md(p.cite) + "</span>";
+    toast(I18N.t("preset.loaded"), "good");
   }
 
   /* ============================================================ field help */
@@ -3158,6 +3219,7 @@
         renderAdvice(c);
       });
       if (STATE.thermo.result) renderThermo();
+      buildPresetPickers();
       buildGuide();
     });
 
@@ -3246,53 +3308,106 @@
   }
 
   const GUIDE_HTML = [
-    "<p>AdsorpFit fits adsorption data in your browser. Nothing is uploaded",
+    "<p>AdsorpFit fits adsorption data in your browser. Nothing is uploaded: ",
     "the Python scientific stack runs locally through WebAssembly, so your ",
     "unpublished data stays on your machine.</p>",
+
     "<h3>Getting a result</h3><ol>",
-    "<li>Paste two columns of data, or upload a CSV. Column 1 is time (kinetics) ",
-    "or equilibrium concentration (isotherms); column 2 is the loading q.</li>",
-    "<li>Fill in the experiment panel. Temperature is needed by Temkin and ",
-    "Dubinin–Radushkevich; molar mass is needed for the D–R mean free energy and ",
-    "for the thermodynamic K° conversion; initial concentrations enable the ",
-    "Langmuir separation factor R<sub>L</sub>.</li>",
-    "<li>Select models and press <strong>Fit models</strong>.</li></ol>",
+    "<li>Pick one of the built-in examples from the dropdown, or paste two ",
+    "columns of your own. Column 1 is time (kinetics) or equilibrium ",
+    "concentration (isotherms); column 2 is the loading q. A third column is ",
+    "read as error bars, and on the isotherm tab a fourth is read as the ",
+    "initial concentration C<sub>0</sub>, which enables R<sub>L</sub>.</li>",
+    "<li>Fill in the experiment panel. The <em>?</em> beside a field explains ",
+    "what it is for and whether you need it at all.</li>",
+    "<li>Press <strong>Analyse my data</strong> to see which models your data ",
+    "can support, then <strong>Fit models</strong>.</li></ol>",
+
+    "<h3>The model advisor</h3>",
+    "<p>Selecting twenty models and reporting whichever has the highest R² is ",
+    "the commonest way to arrive at a mechanism the data never contained. The ",
+    "advisor reads the shape of your raw data first: does the isotherm ",
+    "plateau, is it linear or sigmoidal, did the kinetics reach equilibrium, ",
+    "are there enough early points to fix a rate constant. It then runs a ",
+    "quick trial fit and sorts every model into recommended, usable or not ",
+    "advised, with the reason attached.</p>",
+    "<p>Physics overrides statistics there. A model that predicts impossible ",
+    "values is rejected however well it fits, and among models that are ",
+    "statistically tied the simplest one is recommended.</p>",
+
     "<h3>Three things worth knowing before you report anything</h3>",
-    "<p><strong>Do not rank models by R².</strong> R² can only increase when you ",
-    "add a parameter, so comparing a two-parameter Langmuir against a ",
+
+    "<p><strong>Do not rank models by R².</strong> R² can only increase when ",
+    "you add a parameter, so comparing a two-parameter Langmuir against a ",
     "four-parameter Fritz–Schlünder on R² is guaranteed to favour the latter ",
-    "regardless of whether the extra parameters mean anything. AdsorpFit ranks on ",
-    "AICc, which penalises complexity, and reports Akaike weights so you can see ",
-    "when two models are genuinely indistinguishable (Δ &lt; 2).</p>",
-    "<p><strong>Non-linear regression is the correct method.</strong> Linearising ",
-    "an adsorption model changes the error structure: plotting t/q<sub>t</sub> ",
-    "against t, for instance, puts t on both axes and manufactures a correlation, ",
-    "which is the main reason pseudo-second-order appears to fit almost every ",
-    "published dataset. AdsorpFit fits the untransformed equation and shows the ",
-    "linear plots only for comparison.</p>",
+    "whether or not the extra parameters mean anything. AdsorpFit ranks on ",
+    "AICc and reports Akaike weights, so when two models are genuinely ",
+    "indistinguishable (Δ &lt; 2) it says so instead of declaring a winner.</p>",
+
+    "<p><strong>Non-linear regression is the correct method.</strong> ",
+    "Linearising an adsorption model changes the error structure: plotting ",
+    "t/q<sub>t</sub> against t puts t on both axes and manufactures a ",
+    "correlation, which is the main reason pseudo-second-order appears to fit ",
+    "almost every published dataset. AdsorpFit fits the untransformed ",
+    "equation and shows the linear plots only for comparison, flagging cases ",
+    "where the linearisation is flattering itself.</p>",
+
     "<p><strong>ΔG° depends on how you make K° dimensionless.</strong> ",
-    "−RT ln K requires a dimensionless K. A Langmuir K<sub>L</sub> in L/mg is not ",
-    "dimensionless, and different unit choices for the same experiment give ΔG° ",
-    "values differing by tens of kJ/mol. The Thermodynamics tab makes you choose ",
-    "a conversion route explicitly and states it in the output, because it must ",
-    "be stated in your paper too.</p>",
-    "<h3>Checks AdsorpFit runs for you</h3><ul>",
-    "<li>Whether a fitted parameter's standard error exceeds the parameter ",
-    "itself, i.e. whether the data actually determine it.</li>",
-    "<li>Whether q<sub>e,cal</sub> agrees with q<sub>e,exp</sub>, which catches ",
-    "bad kinetic fits that R² misses.</li>",
-    "<li>Whether the fitted q<sub>max</sub> lies far outside the measured range, ",
+    "−RT ln K requires a dimensionless K. A Langmuir K<sub>L</sub> in L/mg is ",
+    "not dimensionless, and different unit choices for the same experiment ",
+    "give ΔG° values differing by tens of kJ/mol. The Thermodynamics tab ",
+    "makes you choose a conversion route explicitly and states it in the ",
+    "output, because it must be stated in your paper too.</p>",
+
+    "<h3>Where models stop being valid</h3>",
+    "<p>Several of these equations are unbounded. Temkin contains ",
+    "ln(A<sub>T</sub>C<sub>e</sub>) and runs to minus infinity as ",
+    "C<sub>e</sub> approaches zero; Harkins–Jura is singular at ",
+    "C<sub>e</sub> = 10<sup>B</sup>; liquid-phase BET divides by ",
+    "(C<sub>s</sub> − C<sub>e</sub>). Least squares has no objection to a ",
+    "negative loading, so a fit can reach R² = 0.96 while predicting q = −14 ",
+    "mg/g at your lowest point. AdsorpFit checks each model's domain against ",
+    "your data before fitting and its fitted parameters afterwards, and ",
+    "blocks the result rather than quietly reporting it.</p>",
+
+    "<h3>Other checks it runs for you</h3><ul>",
+    "<li>Whether a parameter's standard error exceeds the parameter itself, ",
+    "meaning the data do not determine it.</li>",
+    "<li>Whether q<sub>e,cal</sub> agrees with q<sub>e,exp</sub>. This ",
+    "catches more bad kinetic fits than R² does.</li>",
+    "<li>Whether a fitted q<sub>max</sub> lies far above the measured range, ",
     "making it an extrapolation rather than a measurement.</li>",
-    "<li>Whether a three- or four-parameter model has collapsed onto a simpler ",
-    "one (Sips with m = 1 is Langmuir; Redlich–Peterson with g = 1 is Langmuir).</li>",
+    "<li>Whether a three- or four-parameter model has collapsed onto a ",
+    "simpler one: Sips with m = 1 is Langmuir, Redlich–Peterson with g = 1 is ",
+    "Langmuir, Tóth with n = 1 is Langmuir.</li>",
     "<li>Whether a parameter has hit a physical bound.</li>",
-    "<li>Whether a linearised fit is flattering itself relative to the same ",
-    "parameters tested against the raw data.</li></ul>",
+    "<li>Whether the van't Hoff plot is curved, meaning ΔH° is not constant ",
+    "over your temperature range.</li></ul>",
+
+    "<h3>The workspace</h3><ul>",
+    "<li><strong>Resize the columns</strong> by dragging the divider between ",
+    "them, and any panel by the dotted handle along its bottom edge.</li>",
+    "<li><strong>Move a panel</strong> by the grip in its header, within a ",
+    "column or across to the other one.</li>",
+    "<li><strong>Focus one panel</strong> over the whole window with the ",
+    "expand button; Escape returns.</li>",
+    "<li><strong>Projects</strong> save your data, settings, selected models ",
+    "and figure styling under a name, and reopening one rebuilds the results ",
+    "as well. They live in this browser, so export one to a file to move it ",
+    "to another machine.</li>",
+    "<li><strong>Settings</strong> holds the theme, background motion, layout ",
+    "and density, and the language switch.</li></ul>",
+
     "<h3>Citing the models</h3>",
-    "<p>Every model card carries the original citation. Cite the primary ",
-    "source (Lagergren 1898, Ho &amp; McKay 1999, Langmuir 1918), not a recent paper ",
-    "that happens to use the model. The <em>?</em> button beside each model shows ",
-    "its equation, parameter meanings, assumptions and reference.</p>"
+    "<p>Every model card carries its primary citation, reachable from the ",
+    "<em>?</em> beside the model name, along with its equation, parameter ",
+    "meanings and assumptions. Cite the original source (Lagergren 1898, ",
+    "Ho &amp; McKay 1999, Langmuir 1918) rather than a recent paper that ",
+    "happens to use the model.</p>",
+    "<p>The built-in example data are real measurements from Wang et al. ",
+    "(2021) <em>R. Soc. Open Sci.</em> <strong>8</strong>, 201789, with the ",
+    "raw data released on Zenodo under CC0. If you publish anything derived ",
+    "from them, cite that paper.</p>"
   ].join("");
 
   /* =================================================================== go */
