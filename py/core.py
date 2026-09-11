@@ -1,0 +1,549 @@
+"""
+AdsorpFit - core model specification framework, fitting engine and statistics.
+
+Everything numerical in AdsorpFit flows through this module. It defines:
+
+  * ParamSpec / ModelSpec   - declarative description of a model, its
+                              parameters, units, physical meaning and bounds
+  * fit_model()             - bounded non-linear least squares (SciPy TRF)
+                              with a covariance-based uncertainty estimate
+  * fit_linear()            - the classical linearised fit, kept as an option
+  * statistics()            - the full error-function battery used in the
+                              adsorption literature
+  * rank_models()           - information-criterion based model selection
+
+Design notes
+------------
+Non-linear regression is the default because linearising an adsorption model
+distorts the error structure: least squares assumes the residuals are
+independent and identically distributed on the *fitted* variable, and a
+transform such as t/qt or 1/qe re-weights the points so that the fit is
+dominated by whichever end of the data the transform happens to inflate.
+The linear route is still implemented, because reviewers frequently ask for
+it, but it is reported alongside the non-linear result so the two can be
+compared directly.
+
+References for the statistical treatment:
+  Tran, H.N. et al. (2017) Water Research 120, 88-116.
+  El-Khaiary, M.I. (2008) J. Hazard. Mater. 158, 73-87.
+  Wang, J. & Guo, X. (2020) J. Hazard. Mater. 390, 122156.
+"""
+
+from __future__ import annotations
+
+import math
+import warnings
+from dataclasses import dataclass, field
+from typing import Callable, Sequence
+
+import numpy as np
+from scipy.optimize import least_squares, curve_fit
+from scipy import stats as sps
+
+R_GAS = 8.314462618          # J / (mol K)
+WATER_MOLARITY = 55.5        # mol / L, pure water at ~298 K
+
+
+# --------------------------------------------------------------------------
+# Declarative model description
+# --------------------------------------------------------------------------
+
+@dataclass
+class ParamSpec:
+    """One fitted parameter of a model."""
+
+    key: str
+    symbol: str                  # LaTeX-ish symbol for display, e.g. "q_m"
+    unit: str                    # e.g. "mg g^-1"; "-" for dimensionless
+    meaning: str                 # plain-language physical meaning
+    lower: float = 0.0
+    upper: float = np.inf
+    guess: float = 1.0
+    # optional callable(x, y) -> float producing a data-driven initial guess
+    guess_fn: Callable | None = None
+    # if set, the parameter is constrained to this range for physical reasons
+    physical_note: str = ""
+
+    def initial(self, x: np.ndarray, y: np.ndarray) -> float:
+        if self.guess_fn is not None:
+            try:
+                g = float(self.guess_fn(x, y))
+                if np.isfinite(g) and self.lower < g < self.upper:
+                    return g
+            except Exception:
+                pass
+        return float(np.clip(self.guess, self.lower + 1e-12,
+                             self.upper if np.isfinite(self.upper) else 1e12))
+
+
+@dataclass
+class LinearForm:
+    """Classical linearised form of a model, y* = a + b x*."""
+
+    name: str                                     # e.g. "Type I"
+    x_label: str
+    y_label: str
+    # transform(x, y, aux) -> (x_star, y_star); may return NaN for invalid pts
+    transform: Callable
+    # recover(slope, intercept, aux) -> dict of model parameters
+    recover: Callable
+    note: str = ""
+
+
+@dataclass
+class ModelSpec:
+    """Full declarative description of one adsorption model."""
+
+    key: str
+    name: str
+    category: str                                 # kinetics | isotherm | thermo
+    func: Callable                                # func(x, *params) -> y
+    params: list[ParamSpec]
+    equation: str                                 # LaTeX body, no delimiters
+    equation_plain: str                           # ASCII fallback
+    citation: str
+    year: str = ""
+    assumptions: list[str] = field(default_factory=list)
+    interpretation: Callable | None = None        # (fit, ctx) -> list[str]
+    linear_forms: list[LinearForm] = field(default_factory=list)
+    # models that need experimental context beyond (x, y)
+    requires: list[str] = field(default_factory=list)
+    family: str = ""                              # e.g. "2-parameter"
+    notes: str = ""
+
+    @property
+    def n_params(self) -> int:
+        return len(self.params)
+
+    def p0(self, x, y) -> np.ndarray:
+        return np.array([p.initial(x, y) for p in self.params], float)
+
+    def bounds(self):
+        return (np.array([p.lower for p in self.params], float),
+                np.array([p.upper for p in self.params], float))
+
+
+# --------------------------------------------------------------------------
+# Error functions / goodness of fit
+# --------------------------------------------------------------------------
+
+def statistics(y_obs: np.ndarray, y_cal: np.ndarray, n_params: int) -> dict:
+    """Return the full error-function battery used in adsorption papers.
+
+    All quantities follow the definitions collected by Tran et al. (2017)
+    and El-Khaiary (2008).  ``n_params`` is needed for the degree-of-freedom
+    corrections (adjusted R^2, reduced chi^2, AIC/BIC).
+    """
+    y_obs = np.asarray(y_obs, float)
+    y_cal = np.asarray(y_cal, float)
+    n = y_obs.size
+    resid = y_obs - y_cal
+    dof = max(n - n_params, 1)
+
+    sse = float(np.sum(resid ** 2))
+    sst = float(np.sum((y_obs - y_obs.mean()) ** 2))
+    mse = sse / n
+    rmse = math.sqrt(mse)
+
+    r2 = 1.0 - sse / sst if sst > 0 else np.nan
+    # adjusted R^2 penalises extra parameters; the correct denominator is
+    # n - p (not n - p - 1) when p already counts the model's own constant.
+    adj_r2 = 1.0 - (1.0 - r2) * (n - 1) / dof if sst > 0 and dof > 0 else np.nan
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        safe = np.where(np.abs(y_cal) > 1e-12, y_cal, np.nan)
+        rel = resid / safe
+        chi2 = float(np.nansum(resid ** 2 / safe))
+        are = 100.0 / n * float(np.nansum(np.abs(rel)))
+        hybrid = 100.0 / dof * float(np.nansum(resid ** 2 / safe))
+        mpsd = 100.0 * math.sqrt(float(np.nansum(rel ** 2)) / dof)
+        ssre = float(np.nansum(rel ** 2))
+
+    eabs = float(np.sum(np.abs(resid)))
+    mae = eabs / n
+    # standard deviation of relative errors (Delta q, %)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        dq = 100.0 * math.sqrt(
+            float(np.nansum(((y_obs - y_cal) / np.where(y_obs != 0, y_obs, np.nan)) ** 2)) / dof
+        )
+
+    # Information criteria (Gaussian likelihood, variance profiled out)
+    if sse > 0:
+        aic = n * math.log(sse / n) + 2 * n_params
+        # small-sample correction; guard the pole at n = p + 1
+        denom = n - n_params - 1
+        aicc = aic + (2 * n_params * (n_params + 1) / denom) if denom > 0 else np.inf
+        bic = n * math.log(sse / n) + n_params * math.log(n)
+    else:
+        aic = aicc = bic = -np.inf
+
+    return {
+        "n": n, "n_params": n_params, "dof": dof,
+        "SSE": sse, "MSE": mse, "RMSE": rmse,
+        "R2": r2, "adj_R2": adj_r2,
+        "chi2": chi2, "chi2_red": chi2 / dof,
+        "ARE": are, "HYBRID": hybrid, "MPSD": mpsd, "SSRE": ssre,
+        "EABS": eabs, "MAE": mae, "delta_q": dq,
+        "AIC": aic, "AICc": aicc, "BIC": bic,
+    }
+
+
+# --------------------------------------------------------------------------
+# Fit result container
+# --------------------------------------------------------------------------
+
+@dataclass
+class FitResult:
+    model_key: str
+    model_name: str
+    method: str                      # "nonlinear" | "linear:<form>"
+    success: bool
+    params: dict                     # key -> value
+    stderr: dict                     # key -> 1 sigma standard error
+    ci95: dict                       # key -> (low, high)
+    tvalue: dict                     # key -> parameter / stderr
+    pvalue: dict
+    stats: dict
+    x: np.ndarray
+    y: np.ndarray
+    y_cal: np.ndarray
+    residuals: np.ndarray
+    message: str = ""
+    derived: dict = field(default_factory=dict)   # e.g. R_L, E, h
+    warnings: list = field(default_factory=list)
+
+    def curve(self, n: int = 300, x_min=None, x_max=None):
+        """Dense smooth curve for plotting."""
+        lo = float(np.min(self.x)) if x_min is None else x_min
+        hi = float(np.max(self.x)) if x_max is None else x_max
+        lo = min(lo, 0.0) if lo > 0 else lo
+        xs = np.linspace(lo, hi, n)
+        return xs, self._fn(xs)
+
+    _fn: Callable | None = None
+
+
+# --------------------------------------------------------------------------
+# The fitting engines
+# --------------------------------------------------------------------------
+
+def fit_model(spec: ModelSpec,
+              x: Sequence[float],
+              y: Sequence[float],
+              ctx: dict | None = None,
+              weights: str = "none",
+              p0: Sequence[float] | None = None,
+              n_restarts: int = 6,
+              loss: str = "linear",
+              max_nfev: int = 20000) -> FitResult:
+    """Bounded non-linear least squares fit of ``spec`` to (x, y).
+
+    ``weights`` selects the residual weighting:
+        "none"      ordinary least squares            w_i = 1
+        "relative"  minimise relative error           w_i = 1 / y_i
+        "sqrt"      Poisson-like                      w_i = 1 / sqrt(y_i)
+
+    Multi-start is used because several adsorption models (Toth, Baudu,
+    Fritz-Schlunder, Avrami) have shallow, strongly correlated optima and a
+    single start from a naive guess lands in a local minimum often enough to
+    matter.
+    """
+    ctx = ctx or {}
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    mask = np.isfinite(x) & np.isfinite(y)
+    x, y = x[mask], y[mask]
+
+    if x.size < spec.n_params:
+        return _failed(spec, x, y,
+                       f"Need at least {spec.n_params} points to fit "
+                       f"{spec.n_params} parameters; got {x.size}.")
+
+    if weights == "relative":
+        w = 1.0 / np.where(np.abs(y) > 1e-12, np.abs(y), 1e-12)
+    elif weights == "sqrt":
+        w = 1.0 / np.sqrt(np.where(np.abs(y) > 1e-12, np.abs(y), 1e-12))
+    else:
+        w = np.ones_like(y)
+
+    def model_fn(xv, theta):
+        return spec.func(xv, *theta, **_ctx_kwargs(spec, ctx))
+
+    def resid(theta):
+        try:
+            pred = model_fn(x, theta)
+        except Exception:
+            return np.full_like(y, 1e6)
+        pred = np.asarray(pred, float)
+        bad = ~np.isfinite(pred)
+        if bad.any():
+            pred = np.where(bad, 1e6, pred)
+        return (pred - y) * w
+
+    lo, hi = spec.bounds()
+    starts = []
+    base = np.asarray(p0, float) if p0 is not None else spec.p0(x, y)
+    starts.append(np.clip(base, lo + 1e-12, hi))
+    rng = np.random.default_rng(12345)
+    for _ in range(max(0, n_restarts - 1)):
+        # log-uniform jitter around the base guess, respecting bounds
+        jit = base * np.exp(rng.normal(0.0, 1.1, size=base.size))
+        hi_c = np.where(np.isfinite(hi), hi, base * 1e6 + 1e6)
+        starts.append(np.clip(jit, lo + 1e-12, hi_c))
+
+    best = None
+    msgs = []
+    for s in starts:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                sol = least_squares(resid, s, bounds=(lo, hi), loss=loss,
+                                    max_nfev=max_nfev, x_scale="jac")
+            if best is None or sol.cost < best.cost:
+                best = sol
+        except Exception as exc:                       # pragma: no cover
+            msgs.append(str(exc))
+            continue
+
+    if best is None:
+        return _failed(spec, x, y, "Optimiser failed from every start. "
+                                   + ("; ".join(msgs[:2])))
+
+    theta = best.x
+    y_cal = np.asarray(model_fn(x, theta), float)
+    st = statistics(y, y_cal, spec.n_params)
+
+    # Covariance from the Gauss-Newton approximation J^T J, scaled by the
+    # residual variance.  This is the same estimator curve_fit reports.
+    stderr = _stderr_from_jac(best.jac, best.fun, x.size, spec.n_params)
+
+    params = {p.key: float(v) for p, v in zip(spec.params, theta)}
+    se = {p.key: float(s) for p, s in zip(spec.params, stderr)}
+    tcrit = sps.t.ppf(0.975, st["dof"])
+    ci = {k: (params[k] - tcrit * se[k], params[k] + tcrit * se[k])
+          if np.isfinite(se[k]) else (np.nan, np.nan) for k in params}
+    tval = {k: (params[k] / se[k] if se[k] > 0 else np.nan) for k in params}
+    pval = {k: (float(2 * (1 - sps.t.cdf(abs(tval[k]), st["dof"])))
+                if np.isfinite(tval[k]) else np.nan) for k in params}
+
+    warns = []
+    for p in spec.params:
+        v = params[p.key]
+        if np.isfinite(se[p.key]) and se[p.key] > abs(v):
+            warns.append(
+                f"{p.symbol} is not resolved by these data: its standard error "
+                f"({se[p.key]:.3g}) exceeds the estimate itself ({v:.3g}). "
+                f"Treat this parameter as indeterminate."
+            )
+        if np.isfinite(p.upper) and abs(v - p.upper) < 1e-6 * max(1.0, abs(p.upper)):
+            warns.append(f"{p.symbol} hit its upper bound ({p.upper:g}) - "
+                         f"the optimum lies outside the physically allowed range.")
+        if abs(v - p.lower) < 1e-9 and p.lower == 0.0:
+            warns.append(f"{p.symbol} collapsed to zero, which usually means "
+                         f"this model term is not supported by the data.")
+
+    res = FitResult(
+        model_key=spec.key, model_name=spec.name, method="nonlinear",
+        success=True, params=params, stderr=se, ci95=ci,
+        tvalue=tval, pvalue=pval, stats=st,
+        x=x, y=y, y_cal=y_cal, residuals=y - y_cal,
+        message=f"converged in {best.nfev} function evaluations",
+        warnings=warns,
+    )
+    res._fn = lambda xv: np.asarray(model_fn(np.asarray(xv, float), theta), float)
+    return res
+
+
+def fit_linear(spec: ModelSpec, form: LinearForm,
+               x: Sequence[float], y: Sequence[float],
+               ctx: dict | None = None) -> FitResult:
+    """Classical linearised fit: ordinary least squares on transformed axes.
+
+    Reported for comparison only.  The R^2 returned is the R^2 *of the
+    transformed variables*, which is what the literature quotes and is
+    exactly why linearised fits look deceptively good.  The error battery is
+    additionally recomputed on the original q scale so the two can be
+    compared honestly.
+    """
+    ctx = ctx or {}
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    with np.errstate(all="ignore"):
+        xs, ys = form.transform(x, y, ctx)
+    xs = np.asarray(xs, float)
+    ys = np.asarray(ys, float)
+    ok = np.isfinite(xs) & np.isfinite(ys)
+    if ok.sum() < 2:
+        return _failed(spec, x, y, "Linearisation produced fewer than two "
+                                   "valid points (log or reciprocal of a "
+                                   "non-positive value).")
+
+    lr = sps.linregress(xs[ok], ys[ok])
+    try:
+        params = form.recover(lr.slope, lr.intercept, ctx)
+    except Exception as exc:
+        return _failed(spec, x, y, f"Could not recover parameters: {exc}")
+
+    theta = [params.get(p.key, np.nan) for p in spec.params]
+    try:
+        y_cal = np.asarray(spec.func(x, *theta, **_ctx_kwargs(spec, ctx)), float)
+    except Exception:
+        y_cal = np.full_like(y, np.nan)
+
+    st = statistics(y, y_cal, spec.n_params)
+    st["R2_linear"] = lr.rvalue ** 2
+    st["slope"] = lr.slope
+    st["intercept"] = lr.intercept
+    st["slope_se"] = lr.stderr
+    st["intercept_se"] = lr.intercept_stderr
+    st["n_points_used"] = int(ok.sum())
+
+    warns = []
+    if ok.sum() < xs.size:
+        warns.append(
+            f"{xs.size - ok.sum()} of {xs.size} points were discarded by the "
+            f"{form.name} linearisation (the transform is undefined for them). "
+            f"The non-linear fit uses all points."
+        )
+    if np.isfinite(st["R2"]) and np.isfinite(st["R2_linear"]) \
+            and st["R2_linear"] - st["R2"] > 0.05:
+        warns.append(
+            f"The linear plot reports R^2 = {st['R2_linear']:.4f}, but the "
+            f"same parameters reproduce the raw q data with only R^2 = "
+            f"{st['R2']:.4f}. The linearisation is flattering the fit."
+        )
+
+    res = FitResult(
+        model_key=spec.key, model_name=spec.name,
+        method=f"linear:{form.name}", success=True,
+        params={p.key: float(v) for p, v in zip(spec.params, theta)},
+        stderr={p.key: np.nan for p in spec.params},
+        ci95={p.key: (np.nan, np.nan) for p in spec.params},
+        tvalue={p.key: np.nan for p in spec.params},
+        pvalue={p.key: np.nan for p in spec.params},
+        stats=st, x=x, y=y, y_cal=y_cal, residuals=y - y_cal,
+        message=f"{form.name}: {form.y_label} vs {form.x_label}",
+        warnings=warns,
+    )
+    res.derived["linear_x"] = xs
+    res.derived["linear_y"] = ys
+    res.derived["linear_mask"] = ok
+    res._fn = lambda xv: np.asarray(
+        spec.func(np.asarray(xv, float), *theta, **_ctx_kwargs(spec, ctx)), float)
+    return res
+
+
+# --------------------------------------------------------------------------
+# Model selection
+# --------------------------------------------------------------------------
+
+def rank_models(results: Sequence[FitResult], criterion: str = "AICc") -> list[dict]:
+    """Rank fitted models and compute Akaike weights.
+
+    Akaike weights give the probability that each candidate is the best
+    approximating model *within the set tested* - which is the honest way to
+    compare a 2-parameter model against a 4-parameter one.  Comparing raw
+    R^2 across models of different parameter count, as most papers do,
+    always favours the model with more parameters.
+    """
+    ok = [r for r in results if r.success and np.isfinite(r.stats.get(criterion, np.nan))]
+    if not ok:
+        return []
+    vals = np.array([r.stats[criterion] for r in ok], float)
+    best = vals.min()
+    delta = vals - best
+    if criterion in ("AIC", "AICc", "BIC"):
+        wl = np.exp(-0.5 * delta)
+        weights = wl / wl.sum()
+    else:
+        weights = np.full(delta.size, np.nan)
+
+    order = np.argsort(delta)
+    out = []
+    for rank, i in enumerate(order, start=1):
+        r = ok[i]
+        out.append({
+            "rank": rank,
+            "model_key": r.model_key,
+            "model_name": r.model_name,
+            "criterion": criterion,
+            "value": float(vals[i]),
+            "delta": float(delta[i]),
+            "weight": float(weights[i]),
+            "R2": r.stats["R2"],
+            "adj_R2": r.stats["adj_R2"],
+            "RMSE": r.stats["RMSE"],
+            "n_params": r.stats["n_params"],
+            "evidence": ("best model in this set" if rank == 1
+                         else _evidence_phrase(float(delta[i]))),
+        })
+    return out
+
+
+def _evidence_phrase(delta: float) -> str:
+    """Burnham & Anderson's rule of thumb for Delta-AIC."""
+    if delta < 2:
+        return "substantial support - indistinguishable from the best model"
+    if delta < 4:
+        return "strong support"
+    if delta < 7:
+        return "considerably less support"
+    if delta < 10:
+        return "weak support"
+    return "essentially no support"
+
+
+# --------------------------------------------------------------------------
+# helpers
+# --------------------------------------------------------------------------
+
+def _ctx_kwargs(spec: ModelSpec, ctx: dict) -> dict:
+    """Pass only the context values this model actually declares."""
+    return {k: ctx[k] for k in spec.requires if k in ctx}
+
+
+def _stderr_from_jac(jac, fun, n, p) -> np.ndarray:
+    """1-sigma parameter standard errors from the least-squares Jacobian."""
+    try:
+        _, s, VT = np.linalg.svd(jac, full_matrices=False)
+        tol = np.finfo(float).eps * max(jac.shape) * (s[0] if s.size else 0.0)
+        s = s[s > tol]
+        VT = VT[:s.size]
+        pcov = np.dot(VT.T / s ** 2, VT)
+        dof = max(n - p, 1)
+        s_sq = float(np.sum(fun ** 2)) / dof
+        pcov = pcov * s_sq
+        se = np.sqrt(np.diag(pcov))
+        out = np.full(p, np.nan)
+        out[:se.size] = se
+        return out
+    except Exception:
+        return np.full(p, np.nan)
+
+
+def _failed(spec: ModelSpec, x, y, msg: str) -> FitResult:
+    nan = {p.key: np.nan for p in spec.params}
+    return FitResult(
+        model_key=spec.key, model_name=spec.name, method="nonlinear",
+        success=False, params=dict(nan), stderr=dict(nan),
+        ci95={k: (np.nan, np.nan) for k in nan},
+        tvalue=dict(nan), pvalue=dict(nan),
+        stats=statistics(y, np.full_like(y, np.nan), spec.n_params)
+        if len(y) else {},
+        x=np.asarray(x, float), y=np.asarray(y, float),
+        y_cal=np.full_like(np.asarray(y, float), np.nan),
+        residuals=np.full_like(np.asarray(y, float), np.nan),
+        message=msg,
+    )
+
+
+def fmt(value: float, sig: int = 4) -> str:
+    """Format a number the way a journal table would."""
+    if value is None or (isinstance(value, float) and not np.isfinite(value)):
+        return "n.d."
+    a = abs(value)
+    if a == 0:
+        return "0"
+    if a >= 1e5 or a < 1e-3:
+        return f"{value:.{sig - 1}e}"
+    return f"{value:.{max(0, sig - 1 - int(math.floor(math.log10(a))))}f}"

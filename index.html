@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdsorpFit — Adsorption Kinetics, Isotherm & Thermodynamic Fitting</title>
+<meta name="description" content="Free browser-based fitting of adsorption kinetics, isotherm and thermodynamic data. 34 models, non-linear regression, publication-quality figures and automatic interpretation of every parameter.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+</head>
+<body>
+
+<!-- ===================== water background ===================== -->
+<div id="water-bg" aria-hidden="true">
+  <canvas id="caustics"></canvas>
+  <div class="waves">
+    <svg viewBox="0 0 2400 320" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="wg1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#5cc6d8"/><stop offset="100%" stop-color="#1b8cb8"/>
+        </linearGradient>
+        <linearGradient id="wg2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2aa9c4"/><stop offset="100%" stop-color="#0a5a7e"/>
+        </linearGradient>
+        <linearGradient id="wg3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1073a0"/><stop offset="100%" stop-color="#062c43"/>
+        </linearGradient>
+      </defs>
+      <g class="wave-layer wave-3">
+        <path fill="url(#wg3)" d="M0,190 C200,140 400,240 600,190 C800,140 1000,240 1200,190 C1400,140 1600,240 1800,190 C2000,140 2200,240 2400,190 L2400,320 L0,320 Z"/>
+      </g>
+      <g class="wave-layer wave-2">
+        <path fill="url(#wg2)" d="M0,215 C150,175 350,255 600,215 C850,175 1050,255 1200,215 C1350,175 1550,255 1800,215 C2050,175 2250,255 2400,215 L2400,320 L0,320 Z"/>
+      </g>
+      <g class="wave-layer wave-1">
+        <path fill="url(#wg1)" d="M0,245 C240,210 360,280 600,245 C840,210 960,280 1200,245 C1440,210 1560,280 1800,245 C2040,210 2160,280 2400,245 L2400,320 L0,320 Z"/>
+      </g>
+    </svg>
+  </div>
+  <div id="bubbles"></div>
+</div>
+
+<!-- ===================== boot overlay ===================== -->
+<div id="boot">
+  <div class="boot-card">
+    <div class="boot-ring">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="27" stroke="#cfe0e8" stroke-width="5"/>
+        <path d="M32 5a27 27 0 0 1 27 27" stroke="#1b8cb8" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="boot-title">AdsorpFit</div>
+    <div class="boot-msg" id="boot-msg">Starting the scientific Python runtime…</div>
+    <div class="boot-bar"><i id="boot-bar"></i></div>
+    <p class="tiny" style="margin-top:18px">
+      This loads NumPy, SciPy and Matplotlib into your browser. It happens once
+      per visit and takes roughly 10–20 seconds. Nothing you enter ever leaves
+      your computer — all fitting runs locally.
+    </p>
+  </div>
+</div>
+
+<!-- ===================== masthead ===================== -->
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="#" onclick="return false">
+      <span class="brand-mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
+          <path d="M2 16c2.5 0 2.5-2.4 5-2.4S9.5 16 12 16s2.5-2.4 5-2.4S19.5 16 22 16"/>
+          <path d="M2 20c2.5 0 2.5-2.4 5-2.4s2.5 2.4 5 2.4 2.5-2.4 5-2.4 2.5 2.4 5 2.4"/>
+          <circle cx="8" cy="6" r="2"/><circle cx="15" cy="8.5" r="2"/>
+        </svg>
+      </span>
+      <span>
+        <span class="brand-name">AdsorpFit</span><br>
+        <span class="brand-sub">Adsorption data modelling</span>
+      </span>
+    </a>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button role="tab" data-tab="kinetics" aria-selected="true">Kinetics</button>
+      <button role="tab" data-tab="isotherm" aria-selected="false">Isotherms</button>
+      <button role="tab" data-tab="thermo" aria-selected="false">Thermodynamics</button>
+      <button role="tab" data-tab="guide" aria-selected="false">Guide</button>
+    </nav>
+    <button class="icon-btn" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- ================= KINETICS / ISOTHERM (shared layout) ================= -->
+  <section id="panel-kinetics" class="tabpane">
+    <div class="grid-2">
+      <div class="col-left">
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>1 · Data</h2>
+            <span class="hint" id="kin-count">no data</span>
+          </div>
+          <div class="panel-body">
+            <div class="btn-row" style="margin-bottom:12px">
+              <button class="btn sm" data-demo="kinetics">Load example</button>
+              <button class="btn sm" data-clear="kinetics">Clear</button>
+              <label class="btn sm" style="margin:0">
+                Upload CSV
+                <input type="file" accept=".csv,.txt,.tsv" hidden data-file="kinetics">
+              </label>
+            </div>
+            <label class="field">
+              <span class="lbl">Paste two columns: time and q<sub>t</sub></span>
+              <textarea id="kin-data" rows="9" spellcheck="false"
+                placeholder="t (min)&#10;5&#10;10&#10;20&#10;…&#9;&#9;or paste straight from Excel"></textarea>
+              <span class="sub">Tab, comma, semicolon or space separated. A header
+                row is detected automatically. Column 1 = time, column 2 = q<sub>t</sub>.
+                Optional column 3 = error bars on q<sub>t</sub>.</span>
+            </label>
+            <div class="row c2">
+              <label class="field"><span class="lbl">Time unit</span>
+                <select id="kin-tunit"><option>min</option><option>h</option><option>s</option><option>d</option></select>
+              </label>
+              <label class="field"><span class="lbl">q unit</span>
+                <select id="kin-qunit"><option>mg g⁻¹</option><option>mmol g⁻¹</option><option>µmol g⁻¹</option><option>mg kg⁻¹</option></select>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>2 · Experiment</h2>
+            <span class="hint">used by some models</span></div>
+          <div class="panel-body">
+            <div class="row c2">
+              <label class="field"><span class="lbl">Temperature (K)</span>
+                <input type="number" id="kin-T" value="298.15" step="0.01"></label>
+              <label class="field"><span class="lbl">C₀ (mg L⁻¹)</span>
+                <input type="number" id="kin-C0" value="100" step="any"></label>
+              <label class="field"><span class="lbl">Adsorbent dose (g L⁻¹)</span>
+                <input type="number" id="kin-dose" value="1" step="any"></label>
+              <label class="field"><span class="lbl">Particle radius (cm)</span>
+                <input type="number" id="kin-radius" value="0.05" step="any">
+                <span class="sub">For Boyd and Crank diffusion coefficients.</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>3 · Models</h2>
+            <span class="hint"><a href="#" class="btn ghost sm" data-selectall="kinetics">all</a>
+            <a href="#" class="btn ghost sm" data-selectnone="kinetics">none</a></span></div>
+          <div class="panel-body" id="kin-models"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>4 · Fitting options</h2></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl">Residual weighting</span>
+              <select id="kin-weights">
+                <option value="none">Ordinary least squares (equal weight)</option>
+                <option value="relative">Relative error (1/y) — favours small values</option>
+                <option value="sqrt">Poisson-like (1/√y)</option>
+              </select>
+              <span class="sub">Ordinary least squares is the default and the right
+                choice unless your measurement error grows with q.</span></label>
+            <label class="field"><span class="lbl">Ranking criterion</span>
+              <select id="kin-criterion">
+                <option value="AICc">AICc — corrected Akaike (recommended)</option>
+                <option value="AIC">AIC</option>
+                <option value="BIC">BIC — stronger complexity penalty</option>
+                <option value="RMSE">RMSE — no complexity penalty</option>
+              </select></label>
+            <label class="inline-check"><input type="checkbox" id="kin-linear" checked>
+              Also compute classical linearised fits for comparison</label>
+            <button class="btn primary" id="kin-run" style="width:100%;justify-content:center;margin-top:10px">
+              Fit models
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-right">
+        <div id="kin-results"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-isotherm" class="tabpane hidden">
+    <div class="grid-2">
+      <div class="col-left">
+        <div class="panel">
+          <div class="panel-head"><h2>1 · Data</h2><span class="hint" id="iso-count">no data</span></div>
+          <div class="panel-body">
+            <div class="btn-row" style="margin-bottom:12px">
+              <button class="btn sm" data-demo="isotherm">Load example</button>
+              <button class="btn sm" data-clear="isotherm">Clear</button>
+              <label class="btn sm" style="margin:0">Upload CSV
+                <input type="file" accept=".csv,.txt,.tsv" hidden data-file="isotherm"></label>
+            </div>
+            <label class="field">
+              <span class="lbl">Paste two columns: C<sub>e</sub> and q<sub>e</sub></span>
+              <textarea id="iso-data" rows="9" spellcheck="false"
+                placeholder="Ce (mg/L)&#9;qe (mg/g)&#10;0.5&#9;8.1&#10;1.2&#9;17.9&#10;…"></textarea>
+              <span class="sub">Column 1 = equilibrium concentration C<sub>e</sub>,
+                column 2 = equilibrium loading q<sub>e</sub>. Optional column 3 =
+                error bars. Optional column 4 = initial concentration C₀ (enables
+                the Langmuir separation factor R<sub>L</sub>).</span>
+            </label>
+            <div class="row c2">
+              <label class="field"><span class="lbl">C unit</span>
+                <select id="iso-cunit"><option>mg L⁻¹</option><option>mmol L⁻¹</option><option>µmol L⁻¹</option><option>mol L⁻¹</option></select></label>
+              <label class="field"><span class="lbl">q unit</span>
+                <select id="iso-qunit"><option>mg g⁻¹</option><option>mmol g⁻¹</option><option>µmol g⁻¹</option></select></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>2 · Experiment</h2></div>
+          <div class="panel-body">
+            <div class="row c2">
+              <label class="field"><span class="lbl">Temperature (K)</span>
+                <input type="number" id="iso-T" value="298.15" step="0.01"></label>
+              <label class="field"><span class="lbl">Molar mass (g mol⁻¹)</span>
+                <input type="number" id="iso-MW" value="" step="any" placeholder="e.g. 194.19">
+                <span class="sub">Needed for Dubinin–Radushkevich E and for the
+                  thermodynamic K° conversion.</span></label>
+              <label class="field"><span class="lbl">Solubility C<sub>s</sub> (mg L⁻¹)</span>
+                <input type="number" id="iso-Cs" value="" step="any" placeholder="for BET">
+                </label>
+              <label class="field"><span class="lbl">Adsorbent dose (g L⁻¹)</span>
+                <input type="number" id="iso-dose" value="1" step="any"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>3 · Models</h2>
+            <span class="hint"><a href="#" class="btn ghost sm" data-selectall="isotherm">all</a>
+            <a href="#" class="btn ghost sm" data-selectnone="isotherm">none</a></span></div>
+          <div class="panel-body" id="iso-models"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>4 · Fitting options</h2></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl">Residual weighting</span>
+              <select id="iso-weights">
+                <option value="none">Ordinary least squares (equal weight)</option>
+                <option value="relative">Relative error (1/y)</option>
+                <option value="sqrt">Poisson-like (1/√y)</option>
+              </select></label>
+            <label class="field"><span class="lbl">Ranking criterion</span>
+              <select id="iso-criterion">
+                <option value="AICc">AICc — corrected Akaike (recommended)</option>
+                <option value="AIC">AIC</option>
+                <option value="BIC">BIC</option>
+                <option value="RMSE">RMSE</option>
+              </select></label>
+            <label class="inline-check"><input type="checkbox" id="iso-linear" checked>
+              Also compute classical linearised fits</label>
+            <button class="btn primary" id="iso-run" style="width:100%;justify-content:center;margin-top:10px">
+              Fit models
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-right"><div id="iso-results"></div></div>
+    </div>
+  </section>
+
+  <!-- ================= THERMODYNAMICS ================= -->
+  <section id="panel-thermo" class="tabpane hidden">
+    <div class="grid-2">
+      <div class="col-left">
+        <div class="panel">
+          <div class="panel-head"><h2>1 · Isotherms at several temperatures</h2></div>
+          <div class="panel-body">
+            <p class="tiny" style="margin-top:0">
+              Enter one isotherm dataset per temperature. AdsorpFit fits your
+              chosen isotherm model at each temperature, converts its constant
+              into a properly dimensionless K°, and runs the van't Hoff analysis.
+            </p>
+            <div class="btn-row" style="margin:12px 0">
+              <button class="btn sm" id="th-add">+ Add temperature</button>
+              <button class="btn sm" data-demo="thermo">Load example</button>
+              <button class="btn sm" data-clear="thermo">Clear</button>
+            </div>
+            <div id="th-datasets"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>2 · Equilibrium constant</h2>
+            <span class="hint">this choice changes ΔG°</span></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl">Isotherm model to fit at each T</span>
+              <select id="th-model"></select></label>
+            <label class="field"><span class="lbl">Route to a dimensionless K°</span>
+              <select id="th-route"></select></label>
+            <div id="th-route-note" class="callout info" style="margin-bottom:0">
+              <span class="ci">ℹ</span><span></span>
+            </div>
+            <label class="field" style="margin-top:12px">
+              <span class="lbl">Adsorbate molar mass (g mol⁻¹)</span>
+              <input type="number" id="th-MW" step="any" placeholder="required for the Langmuir route">
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>3 · Optional analyses</h2></div>
+          <div class="panel-body">
+            <label class="inline-check"><input type="checkbox" id="th-nonlinear">
+              Non-linear van't Hoff with a ΔC<sub>p</sub> term (needs ≥ 4 temperatures)</label>
+            <label class="inline-check"><input type="checkbox" id="th-isosteric" checked>
+              Isosteric heat of adsorption vs. surface loading</label>
+            <label class="inline-check"><input type="checkbox" id="th-arrhenius">
+              Arrhenius activation energy from kinetic rate constants</label>
+            <div id="th-arr-box" class="hidden" style="margin-top:10px">
+              <label class="field"><span class="lbl">T (K) and rate constant k, one pair per line</span>
+                <textarea id="th-arr-data" rows="5" spellcheck="false"
+                  placeholder="293.15&#9;0.0121&#10;303.15&#9;0.0198&#10;313.15&#9;0.0315"></textarea></label>
+            </div>
+            <button class="btn primary" id="th-run" style="width:100%;justify-content:center;margin-top:12px">
+              Run thermodynamic analysis
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-right"><div id="th-results"></div></div>
+    </div>
+  </section>
+
+  <!-- ================= GUIDE ================= -->
+  <section id="panel-guide" class="tabpane hidden">
+    <div class="panel" style="max-width:860px;margin:22px auto">
+      <div class="panel-head"><h2>How to use AdsorpFit — and how to read what it tells you</h2></div>
+      <div class="panel-body" id="guide-body"></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast-host" id="toasts"></div>
+
+<script src="js/water.js"></script>
+<script src="js/plot.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
