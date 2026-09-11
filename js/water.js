@@ -22,22 +22,38 @@
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------------------------------------------------------------- bubbles */
+
+  // Water tones drawn from the SWAT palette, plus a couple of cooler and
+  // warmer neighbours so the drift has some variety instead of one flat hue.
+  const BUBBLE_HUES = [
+    "#37c8cf",   // SWAT cyan
+    "#6fdce1",   // pale aqua
+    "#2aa9bd",   // teal
+    "#5cc6d8",   // sky
+    "#7fe3c9",   // mint
+    "#4fb3e8",   // cornflower
+    "#a6ebee",   // ice
+    "#3fd0a8"    // sea green
+  ];
+
   function makeBubbles() {
     const host = document.getElementById("bubbles");
     if (!host) return;
-    const n = reduced ? 4 : 11;
+    const n = reduced ? 6 : 18;
     for (let i = 0; i < n; i++) {
       const b = document.createElement("span");
       b.className = "bubble";
-      // Deliberately small. Large bubbles drift across the reading area and
-      // pull the eye away from the numbers, which is the opposite of what a
-      // background should do.
-      const size = 2 + Math.random() * 5;
+      // A wide spread of sizes reads as depth: the small ones sit far back,
+      // the large ones near the glass.
+      const size = 7 + Math.pow(Math.random(), 1.6) * 30;
       b.style.width = size + "px";
       b.style.height = size + "px";
       b.style.left = Math.random() * 100 + "%";
-      b.style.animationDuration = (13 + Math.random() * 20) + "s";
-      b.style.animationDelay = (-Math.random() * 28) + "s";
+      b.style.setProperty("--bub",
+        BUBBLE_HUES[Math.floor(Math.random() * BUBBLE_HUES.length)]);
+      // bigger bubbles rise faster, as real ones do
+      b.style.animationDuration = (26 - size * 0.42 + Math.random() * 14) + "s";
+      b.style.animationDelay = (-Math.random() * 34) + "s";
       host.appendChild(b);
     }
   }

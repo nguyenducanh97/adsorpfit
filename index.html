@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/marks.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=6">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -82,8 +83,8 @@
       </span>
     </a>
     <a class="lab-mark" href="http://www.swatlab.or.kr/" target="_blank"
-       rel="noopener" title="SWAT Lab, Sungkyunkwan University">
-      <img src="assets/swat.png" alt="SWAT Lab" width="196" height="53">
+       rel="noopener" title="SWAT Lab, Sustainable Water Treatment Laboratory">
+      <span class="mark mark-swat" role="img" aria-label="SWAT Lab"></span>
     </a>
     <nav class="tabs" id="tabs" role="tablist">
       <button role="tab" data-tab="kinetics" aria-selected="true" data-i18n="tab.kinetics">Kinetics</button>
@@ -92,12 +93,16 @@
       <button role="tab" data-tab="guide" aria-selected="false" data-i18n="tab.guide">Guide</button>
     </nav>
     <div class="masthead-tools">
-      <div class="lang-switch" id="lang-switch"></div>
-      <button class="icon-btn" id="projects-btn" title="Projects" aria-label="Projects">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-        </svg>
+      <button class="tool-btn" id="projects-btn" title="Save, rename and reopen projects">
+        <span class="ti">&#128190;</span>
+        <span data-i18n="proj.title">Projects</span>
+        <span class="proj-badge hidden" id="proj-current"></span>
       </button>
+      <button class="tool-btn" id="resetlayout-btn" title="Restore the default panel arrangement">
+        <span class="ti">&#8862;</span>
+        <span data-i18n="set.resetLayout">Reset layout</span>
+      </button>
+      <div class="lang-switch" id="lang-switch"></div>
       <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -374,21 +379,19 @@
 <footer class="site-foot">
   <div class="foot-marks">
     <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener"
-       title="SWAT Lab, Sustainable Water Treatment">
-      <img src="assets/swat.png" alt="SWAT Lab, Sustainable Water Treatment"
-           width="196" height="53"></a>
+       title="SWAT Lab, Sustainable Water Treatment Laboratory">
+      <span class="mark mark-swat" role="img" aria-label="SWAT Lab"></span></a>
     <a href="https://www.skku.edu/" target="_blank" rel="noopener"
        title="Sungkyunkwan University">
-      <img src="assets/skku.png" alt="Sungkyunkwan University" width="199" height="48"></a>
+      <span class="mark mark-skku" role="img" aria-label="Sungkyunkwan University"></span></a>
     <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener" title="U-TOP">
-      <img src="assets/utop.png" alt="U-TOP Pioneer" width="130" height="48"></a>
+      <span class="mark mark-utop" role="img" aria-label="U-TOP Pioneer"></span></a>
   </div>
   <div class="fl">
     <span data-i18n="brand.product">A product of</span>
-    <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener">SWAT Lab</a>
-    <span data-i18n="foot.dept">(Sustainable Water Treatment), School of Civil,
-      Architectural Engineering and Landscape Architecture, Sungkyunkwan
-      University</span>, <span data-i18n="brand.and">and</span> U-TOP.
+    <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener">SWAT Lab</a>,
+    <span data-i18n="foot.dept">Sustainable Water Treatment Laboratory,
+      Sungkyunkwan University</span>, <span data-i18n="brand.and">and</span> U-TOP.
   </div>
   <div class="tiny" style="margin-top:6px">
     <span data-i18n="help.footPrivacy">All fitting runs locally in your browser, no data is uploaded.</span>
@@ -406,12 +409,12 @@
 <!-- Bump APP_VERSION on every release. The ?v= query is what forces
      browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
      than serving a cached copy. -->
-<script>window.APP_VERSION = "4";</script>
-<script src="js/i18n.js?v=4"></script>
-<script src="js/prefs.js?v=4"></script>
-<script src="js/layout.js?v=4"></script>
-<script src="js/water.js?v=4"></script>
-<script src="js/plot.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script>window.APP_VERSION = "6";</script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/prefs.js?v=6"></script>
+<script src="js/layout.js?v=6"></script>
+<script src="js/water.js?v=6"></script>
+<script src="js/plot.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>
