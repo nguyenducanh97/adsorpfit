@@ -92,18 +92,54 @@ const Fig = (function () {
 
   /* --------------------------------------------------------- Plotly render */
 
+  // LaTeX commands that appear in axis labels, mapped to the character they
+  // denote. Matplotlib renders the LaTeX directly on export, but Plotly does
+  // not, so without this the thermodynamic axes read "\Delta G^{\circ}" on
+  // screen while the exported figure reads correctly.
+  const TEX_CHARS = {
+    "\\varepsilon": "ε", "\\epsilon": "ε",
+    "\\rightarrow": "→", "\\partial": "∂",
+    "\\propto": "∝", "\\approx": "≈",
+    "\\Delta": "Δ", "\\delta": "δ", "\\Gamma": "Γ",
+    "\\gamma": "γ", "\\lambda": "λ", "\\sigma": "σ",
+    "\\omega": "ω", "\\theta": "θ", "\\alpha": "α",
+    "\\infty": "∞", "\\times": "×", "\\sqrt": "√",
+    "\\beta": "β", "\\circ": "°", "\\cdot": "·",
+    "\\phi": "φ", "\\chi": "χ", "\\rho": "ρ",
+    "\\leq": "≤", "\\geq": "≥", "\\pm": "±",
+    "\\mu": "μ", "\\nu": "ν", "\\pi": "π",
+    "\\le": "≤", "\\ge": "≥", "\\to": "→"
+  };
+
+  // Accept LaTeX-ish input in the label boxes and show it properly in Plotly,
+  // which understands <sub> and <sup> but not TeX.
   function mathify(s) {
-    // Accept LaTeX-ish input in the label boxes and show it properly in
-    // Plotly, which understands a subset via MathJax-free <sub>/<sup>.
     if (!s) return "";
-    return String(s)
+    var out = String(s);
+
+    // a degree sign is not an exponent: K^{\circ} is K-degree, not K raised
+    out = out.replace(/\^\{?\\circ\}?/g, "°");
+
+    // named commands become their characters. Keys are ordered longest first
+    // in the table above so \varepsilon is not matched as \epsilon, and the
+    // leading backslash is part of the key so \beta is not found inside a word.
+    Object.keys(TEX_CHARS).forEach(function (cmd) {
+      out = out.split(cmd).join(TEX_CHARS[cmd]);
+    });
+
+    return out
       .replace(/\$/g, "")
+      .replace(/\\mathrm\{([^}]*)\}/g, "$1")
+      .replace(/\\text\{([^}]*)\}/g, "$1")
       .replace(/\^\{([^}]*)\}/g, "<sup>$1</sup>")
       .replace(/\^(-?\w)/g, "<sup>$1</sup>")
       .replace(/_\{([^}]*)\}/g, "<sub>$1</sub>")
       .replace(/_(\w)/g, "<sub>$1</sub>")
-      .replace(/\\mathrm\{([^}]*)\}/g, "$1")
-      .replace(/\\,/g, " ");
+      // a backslash-comma is a thin space in TeX; a bare comma is punctuation
+      .replace(/\\,/g, " ")
+      .replace(/\\ /g, " ")
+      // anything still carrying a backslash would show literally, so drop it
+      .replace(/\\([A-Za-z]+)/g, "$1");
   }
 
   function draw(divId, traces, style, theme) {

@@ -1107,3 +1107,20 @@ label.field > span.lbl { display: flex; align-items: center; gap: 6px; }
 }
 .preset-cite b { color: var(--text-2); font-weight: 650; }
 .preset-cite .src { display: block; margin-top: 4px; opacity: .85; }
+
+/* --- rendered parameter symbols and units --------------------------------- */
+
+.sym .katex { font-size: 1.02em; }
+.sym.unit .katex { font-size: .88em; color: var(--text-muted); }
+.sym-fallback { font-family: var(--mono); font-size: 12.5px; }
+table.data td .sym { white-space: nowrap; }
+.kv dt .sym { white-space: nowrap; }
+
+/* --- scientific notation in prose ---------------------------------------- */
+
+.interp sub, .callout sub, .advice-item sub, .help-body sub,
+.interp sup, .callout sup, .advice-item sup, .help-body sup {
+  font-size: .72em; line-height: 0;
+}
+.interp sub, .callout sub, .advice-item sub, .help-body sub { vertical-align: -0.28em; }
+.interp sup, .callout sup, .advice-item sup, .help-body sup { vertical-align: 0.45em; }

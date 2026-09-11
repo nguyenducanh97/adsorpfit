@@ -48,6 +48,59 @@ WATER_MOLARITY = 55.5        # mol / L, pure water at ~298 K
 # Declarative model description
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Symbol formatting
+# --------------------------------------------------------------------------
+
+_GREEK = {
+    "α": r"\alpha", "β": r"\beta", "γ": r"\gamma",
+    "Δ": r"\Delta", "ε": r"\varepsilon", "θ": r"\theta",
+    "ν": r"\nu", "σ": r"\sigma", "χ": r"\chi",
+    "φ": r"\phi", "λ": r"\lambda", "ρ": r"\rho",
+}
+_SUBDIGIT = {"₀": "0", "₁": "1", "₂": "2", "₃": "3",
+             "₄": "4", "₅": "5", "₆": "6", "₇": "7",
+             "₈": "8", "₉": "9"}
+
+
+def symbol_to_tex(sym: str) -> str:
+    """Turn a parameter symbol into LaTeX for display.
+
+    The symbols were written in four different notations as the model library
+    grew: ASCII underscores (q_max), Unicode subscripts (k1 with a subscript
+    one), bare letters (n, A, g) and Greek characters. They all rendered
+    literally in the tables, so "q_max" appeared as typed. This normalises
+    them to one form.
+
+    A single-letter subscript stays italic, because it is a variable
+    (K_L, n_T). A longer one is an abbreviation and is set upright
+    (q_max, k_id, K_RP), which is the convention in the physical sciences.
+    """
+    s = sym or ""
+    prime = ""
+    while s.endswith("′") or s.endswith("'"):
+        prime += "'"
+        s = s[:-1]
+    for u, d in _SUBDIGIT.items():
+        if u in s:
+            s = s.replace(u, "_" + d)
+
+    if s in _GREEK:
+        return _GREEK[s] + prime
+
+    if "_" in s:
+        base, sub = s.split("_", 1)
+        base = _GREEK.get(base, base)
+        parts = []
+        for piece in sub.split(","):
+            piece = piece.strip()
+            upright = not ((len(piece) == 1 and piece.isalpha()) or piece.isdigit())
+            parts.append(r"\mathrm{%s}" % piece if upright else piece)
+        return "%s_{%s}%s" % (base, ",".join(parts), prime)
+
+    return _GREEK.get(s, s) + prime
+
+
 def issue(level: str, code: str, text: str) -> dict:
     """One applicability or validity finding.
 
@@ -74,6 +127,12 @@ class ParamSpec:
     guess_fn: Callable | None = None
     # if set, the parameter is constrained to this range for physical reasons
     physical_note: str = ""
+    # explicit LaTeX for display; derived from `symbol` when left blank
+    tex: str = ""
+
+    @property
+    def symbol_tex(self) -> str:
+        return self.tex or symbol_to_tex(self.symbol)
 
     def initial(self, x: np.ndarray, y: np.ndarray) -> float:
         if self.guess_fn is not None:

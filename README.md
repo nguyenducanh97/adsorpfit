@@ -129,6 +129,8 @@ python validation/test_published.py
 python validation/test_domain.py
 python validation/test_literature.py
 python tools/audit.py
+python tools/notation.py
+python tools/csscheck.py css/style.css
 ```
 
 **`test_recovery.py`: synthetic parameter recovery.** Each of the 34 models
@@ -186,6 +188,15 @@ keys referenced but undefined, model metadata completeness, preset integrity and
 attribution, missing asset references, cache-busting consistency, leftover
 debugging statements, credentials in shipped files, unexpected third-party
 hosts, and basic accessibility. Currently 0 errors, 0 warnings.
+
+**`tools/notation.py` — symbol formatting.** Reads the live model objects
+rather than grepping source, so variable names cannot be mistaken for prose,
+and checks that all 91 parameter symbols convert to valid LaTeX. The symbols
+had accumulated in four notations as the library grew (ASCII underscores,
+Unicode subscripts, bare letters, Greek), and all four rendered literally in
+the tables: "q_max" appeared exactly as typed. Symbols and units are now
+rendered with KaTeX, and prose is normalised at render time so both notations
+produce the same markup.
 
 **A limitation, stated plainly.** Most adsorption papers still show raw
 (*t*, *q*t) and (*C*e, *q*e) data only as figures, with the numbers in
