@@ -39,7 +39,9 @@ const Fig = (function () {
     legend: true, legend_loc: "lower right", legend_scale: 0.88,
     legend_frame: false, legend_cols: 1, legend_edge: "#333333",
     legend_handle: 1.6, legend_spacing: 0.35,
-    pad: 0.3, quality: 95, tiff_compression: "tiff_lzw"
+    pad: 0.3, quality: 95, tiff_compression: "tiff_lzw",
+    // on-screen height of the preview box, not part of the export
+    plot_px: 450
   };
 
   // Plotly symbol  ->  matplotlib marker
@@ -106,6 +108,19 @@ const Fig = (function () {
 
   function draw(divId, traces, style, theme) {
     const s = Object.assign({}, DEFAULT_STYLE, style || {});
+
+    // Give the container a definite height before Plotly measures it.
+    //
+    // With responsive:true Plotly re-reads the container on every react().
+    // A container with no explicit height collapses to whatever the CSS
+    // min-height is, so each redraw shrank the plot and everything below it
+    // jumped up the page. Setting an inline height once makes the box
+    // definite; a height the user dragged is already inline, so it wins.
+    const host = document.getElementById(divId);
+    if (host && !host.style.height) {
+      host.style.height = (s.plot_px || 450) + "px";
+    }
+
     const dark = theme === "dark";
     const fg = dark ? "#dbeef5" : "#0d2b38";
     const grid = dark ? "#1b435a" : s.grid_color;

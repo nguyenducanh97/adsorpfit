@@ -477,7 +477,7 @@ table.data tr.best td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 @media (max-width: 1000px) { .figure-shell { grid-template-columns: 1fr; } }
 
 #plot-area {
-  min-height: 460px; background: var(--surface);
+  min-height: 220px; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 
@@ -902,7 +902,10 @@ footer.site-foot .fl { margin-bottom: 5px; }
 .plot-resize:hover { background: color-mix(in srgb, var(--ocean-600) 8%, transparent); }
 .plot-resize:hover::before { background: var(--ocean-600); width: 76px; }
 
-#plot-area, [id$="-plot"] { min-height: 240px; }
+/* Plot boxes carry an inline height set by Fig.draw, so this is only a floor
+   for the moment before the first draw. It must not be the value Plotly ends
+   up measuring, or the plot collapses to it on every redraw. */
+#plot-area, [id$="-plot"] { min-height: 220px; }
 
 /* ==========================================================================
    Institutional marks
@@ -1012,3 +1015,17 @@ footer.site-foot .tiny { max-width: 780px; margin-left: auto; margin-right: auto
 .panel-resize:hover { background: color-mix(in srgb, var(--ocean-600) 8%, transparent); }
 .panel-resize:hover::before { border-color: var(--ocean-600); width: 60px; }
 .panel.collapsed .panel-resize { display: none; }
+
+/* --- inline rename and delete inside a project row ------------------------ */
+
+.proj-item .pn.editable { cursor: text; border-radius: 4px; padding: 1px 4px;
+  margin: -1px -4px; transition: background .14s; }
+.proj-item .pn.editable:hover { background: var(--foam-100); }
+.proj-item input[type="text"] { font-size: 13.5px; padding: 6px 9px; }
+.proj-item.confirming {
+  border-color: color-mix(in srgb, var(--coral) 45%, transparent);
+  background: color-mix(in srgb, var(--coral) 8%, var(--surface-2));
+}
+.proj-item.confirming .pn { color: var(--coral); font-weight: 700; }
+.btn.sm.danger:hover { background: color-mix(in srgb, var(--coral) 12%, transparent);
+  border-color: var(--coral); color: var(--coral); }
