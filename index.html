@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<link rel="stylesheet" href="css/marks.css?v=10">
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/marks.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=11">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -88,13 +88,20 @@
     </nav>
     <div class="masthead-tools">
       <button class="tool-btn" id="projects-btn" title="Save, rename and reopen projects">
-        <span class="ti">&#128190;</span>
+        <span class="ti"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <path d="M17 21v-8H7v8M7 3v5h8"/></svg></span>
         <span data-i18n="proj.title">Projects</span>
         <span class="proj-badge hidden" id="proj-current"></span>
       </button>
       <button class="tool-btn" id="resetlayout-btn" title="Restore the default panel arrangement">
-        <span class="ti">&#8862;</span>
-        <span data-i18n="set.resetLayout">Reset layout</span>
+        <span class="ti"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="18" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="9" rx="1.5"/>
+          <rect x="14" y="16" width="7" height="5" rx="1.5"/></svg></span>
+        <span data-i18n="set.layoutBtn">Layout</span>
       </button>
       <div class="lang-switch" id="lang-switch"></div>
       <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">
@@ -245,10 +252,22 @@
               <label class="field"><span class="lbl" data-i18n="lbl.temperature">Temperature (K)</span>
                 <input type="number" id="iso-T" value="298.15" step="0.01"></label>
               <label class="field"><span class="lbl" data-i18n="lbl.mw">Molar mass (g mol⁻¹)</span>
-                <input type="number" id="iso-MW" value="" step="any" placeholder="e.g. 194.19">
-                <span class="sub" data-i18n="help.mw">Needed for Dubinin–Radushkevich E and for the thermodynamic K° conversion.</span></label>
+                <input type="number" id="iso-MW" value="" step="any" placeholder="e.g. 194.19 for caffeine">
+                <span class="sub" data-i18n="help.mw">The molecular weight of the
+                  substance you are adsorbing, not the adsorbent. Two calculations
+                  need it: Dubinin–Radushkevich, whose mean free energy E only comes
+                  out in kJ/mol if C<sub>e</sub> is converted to mol/L, and the
+                  thermodynamics tab, which converts K<sub>L</sub> from L/mg to
+                  L/mol. Leave it blank if you are fitting neither; every other
+                  model ignores it.</span></label>
               <label class="field"><span class="lbl" data-i18n="lbl.cs">Solubility C<sub>s</sub> (mg L⁻¹)</span>
-                <input type="number" id="iso-Cs" value="" step="any" placeholder="for BET"></label>
+                <input type="number" id="iso-Cs" value="" step="any" placeholder="e.g. 43600 for methylene blue">
+                <span class="sub" data-i18n="help.cs">How much of your adsorbate
+                  dissolves in water before it saturates, at your temperature. Only
+                  the BET model uses it: BET describes layers stacking on top of each
+                  other, which only happens as C<sub>e</sub> approaches saturation,
+                  and its equation divides by (C<sub>s</sub> − C<sub>e</sub>). Look it
+                  up for your compound. Leave it blank unless you are fitting BET.</span></label>
               <label class="field"><span class="lbl" data-i18n="lbl.dose">Adsorbent dose (g L⁻¹)</span>
                 <input type="number" id="iso-dose" value="1" step="any"></label>
             </div>
@@ -404,12 +423,12 @@
 <!-- Bump APP_VERSION on every release. The ?v= query is what forces
      browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
      than serving a cached copy. -->
-<script>window.APP_VERSION = "10";</script>
-<script src="js/i18n.js?v=10"></script>
-<script src="js/prefs.js?v=10"></script>
-<script src="js/layout.js?v=10"></script>
-<script src="js/water.js?v=10"></script>
-<script src="js/plot.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
+<script>window.APP_VERSION = "11";</script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/prefs.js?v=11"></script>
+<script src="js/layout.js?v=11"></script>
+<script src="js/water.js?v=11"></script>
+<script src="js/plot.js?v=11"></script>
+<script src="js/app.js?v=11"></script>
 </body>
 </html>
