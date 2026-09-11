@@ -23,7 +23,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue
+from core import (ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue,
+                  terminal_slope_ratio)
 
 
 # --------------------------------------------------------------------------
@@ -873,38 +874,6 @@ CRANK = ModelSpec(
 # --------------------------------------------------------------------------
 # Domain of applicability
 # --------------------------------------------------------------------------
-
-def terminal_slope_ratio(x, y):
-    """How steeply is the curve still climbing at the end, relative to overall?
-
-    Measuring the rise over the last few points is unreliable: with only two
-    or three points in the window, even a curve that is plainly still growing
-    (q proportional to sqrt(t), say) shows a small rise and looks settled.
-    Comparing the final slope against the mean slope is the honest test,
-    because at true equilibrium the final slope goes to zero whatever the
-    sampling.  Returns ~0 at equilibrium and ~1 for a straight line.
-    """
-    x = np.asarray(x, float)
-    y = np.asarray(y, float)
-    o = np.argsort(x)
-    x, y = x[o], y[o]
-    if x.size < 4 or x[-1] <= x[0]:
-        return 0.0
-    mean_slope = (y[-1] - y[0]) / (x[-1] - x[0])
-    if abs(mean_slope) < 1e-12:
-        return 0.0
-    # slope over the final quarter of the measured range
-    cut = x[0] + 0.75 * (x[-1] - x[0])
-    m = x >= cut
-    if m.sum() < 2:
-        m = np.zeros_like(x, bool)
-        m[-3:] = True
-    xs, ys = x[m], y[m]
-    if xs[-1] <= xs[0]:
-        return 0.0
-    final_slope = float(np.polyfit(xs, ys, 1)[0])
-    return float(abs(final_slope / mean_slope))
-
 
 def _reaches_equilibrium(x, y, ctx):
     """Models that fit q_e need the data to actually approach equilibrium."""

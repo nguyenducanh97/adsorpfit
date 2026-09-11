@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from core import fit_model, rank_models, check_domain, fmt
+from core import (fit_model, rank_models, check_domain, fmt,
+                  terminal_slope_ratio)
 from isotherms import ISOTHERM_MODELS
-from kinetics import KINETIC_MODELS, terminal_slope_ratio
+from kinetics import KINETIC_MODELS
 
 
 # --------------------------------------------------------------------------

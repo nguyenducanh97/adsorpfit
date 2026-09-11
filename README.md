@@ -97,14 +97,38 @@ result rather than quietly reporting it.
 
 ---
 
+## Example datasets
+
+The eight built-in examples are **real measured data**, not synthetic curves.
+They come from:
+
+> Wang, P., Liu, X., Yu, B., Wu, X., Xu, J., Dong, F. & Zheng, Y. (2021)
+> A comparative study on phosphate removal from water using *Phragmites
+> australis* biochars loaded with different metal oxides.
+> *Royal Society Open Science* **8**, 201789.
+> <https://doi.org/10.1098/rsos.201789> (open access)
+>
+> Raw data: Wang, P. (2021) Zenodo. <https://doi.org/10.5281/zenodo.4711711>,
+> released under **CC0 1.0** (public domain dedication).
+
+They were chosen to span behaviours rather than to flatter the tool: two
+isotherms that saturate cleanly, one that never plateaus, one failing adsorbent
+with negative measured uptake, and four kinetic runs ranging from a clean
+approach to equilibrium to one that finished before the first measurement.
+Each preset carries its citation in the interface.
+
+---
+
 ## Validation
 
-Three independent test suites, all runnable offline:
+Four independent test suites plus a project audit, all runnable offline:
 
 ```bash
 python validation/test_recovery.py
 python validation/test_published.py
 python validation/test_domain.py
+python validation/test_literature.py
+python tools/audit.py
 ```
 
 **`test_recovery.py`: synthetic parameter recovery.** Each of the 34 models
@@ -135,12 +159,41 @@ kinetic models warned about on runs that never equilibrated, Weber–Morris with
 a negative boundary-layer intercept, and too few points for the parameter
 count. 20/20 pass.
 
-**A limitation, stated plainly.** Most adsorption papers show raw (*t*, *q*t) and
-(*C*e, *q*e) data only as figures, and the supplementary files of the
-subscription journals are not publicly reachable. So the validation rests on
-synthetic recovery and on parameter-level cross-checks rather than on refitting
-many published raw datasets. If you have institutional access, dropping a few
-papers' raw data into `validation/datasets/` would strengthen this further.
+**`test_literature.py` — refit of published raw data.** The strongest of the
+four, and the one the others could not be: real measurements from a paper,
+refitted here, checked against the numbers that paper reports. Wang et al.
+(2021) deposited their raw data openly, giving six adsorbents with ten isotherm
+points and twelve kinetic points each.
+
+Across twenty isotherm comparisons and twenty kinetic ones, **every fitted
+capacity lands within 0.5 % of the published value and every q_e within 0.05 %**,
+with our R² equal to or slightly better than theirs in all ten isotherm cases.
+Rate constants agree to the precision the paper prints; in the two places they
+differ, our optimum has the lower residual sum of squares, on a dataset whose
+entire signal (0.09 mg/g) sits inside the measurement scatter (0.02 mg/g).
+
+It also checks that the diagnostics fire on the three cases the authors
+themselves describe: Al-BC not reaching equilibrium in 72 h, Al-BC's isotherm
+not plateauing, and the unmodified biochar recording negative uptake. 44/44 pass.
+
+Writing it found a real defect: the isotherm plateau test still used the
+tail-rise measure that the kinetics test had already outgrown, and it missed
+Al-BC. On the terminal-slope measure the four isotherms that do plateau score
+0.02 to 0.13 and the one that does not scores 0.48, so both checks now use it.
+
+**`tools/audit.py` — project audit.** Translation coverage in both directions,
+keys referenced but undefined, model metadata completeness, preset integrity and
+attribution, missing asset references, cache-busting consistency, leftover
+debugging statements, credentials in shipped files, unexpected third-party
+hosts, and basic accessibility. Currently 0 errors, 0 warnings.
+
+**A limitation, stated plainly.** Most adsorption papers still show raw
+(*t*, *q*t) and (*C*e, *q*e) data only as figures, with the numbers in
+supplementary files that subscription journals do not expose. Of roughly a dozen
+papers checked, one had its raw data openly deposited, which is why the
+literature suite rests on a single study (albeit six adsorbents and forty
+comparisons). More datasets in `validation/datasets/` would strengthen it
+further; the format is one small Python module per study.
 
 ---
 

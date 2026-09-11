@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from core import ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue
+from core import (ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue,
+                  terminal_slope_ratio)
 
 # --------------------------------------------------------------------------
 # guess helpers
@@ -1384,24 +1385,35 @@ def _needs_positive_x(name):
 
 
 def _plateau_domain(x, y, ctx):
-    """Saturating models need the data to actually approach saturation."""
+    """Saturating models need the data to actually approach saturation.
+
+    Judged on the terminal slope as well as the rise over the last few
+    points, for the same reason as the kinetics check: with ten points the
+    tail measure alone is noisy, and on real data it missed a case the
+    authors themselves described as not having reached saturation. Across the
+    Wang (2021) phosphate series the four isotherms that do plateau score
+    0.02 to 0.13 on the slope ratio while the one that does not scores 0.48,
+    so the threshold sits comfortably between them.
+    """
     y = np.asarray(y, float)
     if y.size < 4:
         return []
-    # fractional rise over the last third of the concentration range
-    k = max(1, y.size // 3)
-    tail = y[-k:]
     span = float(np.max(y) - np.min(y))
     if span <= 0:
         return []
+    ratio = terminal_slope_ratio(x, y)
+    k = max(1, y.size // 3)
+    tail = y[-k:]
     rise = (float(np.max(tail)) - float(np.min(tail))) / span
-    if rise > 0.25:
+    if ratio > 0.25 or rise > 0.25:
         return [issue(
             "warn", "no_plateau",
-            f"Your isotherm is still rising steeply at the highest concentration, "
-            f"the top third of the data accounts for {rise * 100:.0f}% of the "
-            f"total change in q_e. A saturation capacity fitted to data that never "
-            f"plateau is an extrapolation, not a measurement. Extend the "
+            f"Your isotherm is still rising at the highest concentration: the "
+            f"slope over the final quarter of the range is {ratio * 100:.0f}% of "
+            f"the average slope, and the top third of the data accounts for "
+            f"{rise * 100:.0f}% of the total change in q_e. At saturation both "
+            f"would be near zero. A capacity fitted to data that never plateau is "
+            f"an extrapolation rather than a measurement, so extend the "
             f"concentration range if q_max is the number you want to report.")]
     return []
 

@@ -136,7 +136,25 @@ def fit(payload_json: str) -> str:
             if spec is None:
                 continue
             missing = [r for r in spec.requires if r not in ctx]
-            r = fit_model(spec, x, y, ctx=ctx, weights=weights)
+            # One model must never be able to abort the whole request: the user
+            # asked for a dozen and should get the eleven that worked, with the
+            # twelfth reported as failed.
+            try:
+                r = fit_model(spec, x, y, ctx=ctx, weights=weights)
+            except Exception as exc:
+                payload_models.append({
+                    "model_key": key, "model_name": spec.name, "success": False,
+                    "message": f"This model could not be fitted to these data: {exc}",
+                    "category": spec.category, "family": spec.family,
+                    "equation": spec.equation, "equation_plain": spec.equation_plain,
+                    "citation": spec.citation, "assumptions": spec.assumptions,
+                    "params": {}, "stderr": {}, "ci95": {}, "tvalue": {},
+                    "pvalue": {}, "stats": {}, "warnings": [], "issues": [],
+                    "param_meta": [{"key": q.key, "symbol": q.symbol,
+                                    "unit": q.unit, "meaning": q.meaning}
+                                   for q in spec.params],
+                })
+                continue
             results.append(r)
 
             entry = _result_to_dict(r, spec, ctx)
@@ -149,7 +167,17 @@ def fit(payload_json: str) -> str:
             if also_linear and spec.linear_forms:
                 entry["linear"] = []
                 for lf in spec.linear_forms:
-                    lr = fit_linear(spec, lf, x, y, ctx=ctx)
+                    try:
+                        lr = fit_linear(spec, lf, x, y, ctx=ctx)
+                    except Exception as exc:
+                        entry["linear"].append({
+                            "form_name": lf.name, "success": False,
+                            "x_label": lf.x_label, "y_label": lf.y_label,
+                            "note": lf.note, "params": {}, "stats": {},
+                            "message": f"This linearisation is not defined for "
+                                       f"these data: {exc}",
+                        })
+                        continue
                     d = _result_to_dict(lr, spec, ctx, with_curve=False)
                     d["form_name"] = lf.name
                     d["x_label"] = lf.x_label
@@ -849,8 +877,11 @@ def parse_pasted(text: str) -> str:
             for i, v in enumerate(vals):
                 cols[i].append(v)
 
+        n_rows = len(cols[0]) if cols else 0
+        if n_rows == 0:
+            return _err("No numbers were found in what you pasted. Expected two "
+                        "columns of values, optionally under a header row.")
         return _ok({"columns": _clean(cols), "header": header,
-                    "n_rows": len(cols[0]) if cols else 0,
-                    "n_cols": ncol, "skipped": skipped})
+                    "n_rows": n_rows, "n_cols": ncol, "skipped": skipped})
     except Exception as exc:
         return _err(exc, traceback.format_exc())

@@ -78,7 +78,10 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+/* Both html and body need this: body alone still lets the document scroll
+   horizontally in some engines, and the fixed wave layer is wider than the
+   viewport by design. */
+html { scroll-behavior: smooth; overflow-x: hidden; max-width: 100%; }
 
 body {
   margin: 0;
@@ -1090,3 +1093,17 @@ label.field > span.lbl { display: flex; align-items: center; gap: 6px; }
 }
 .help-body .egs b { font-weight: 600; }
 .help-body .egs span { font-family: var(--mono); font-size: 12.5px; text-align: right; }
+
+/* --- example dataset picker ---------------------------------------------- */
+
+.preset-pick {
+  width: auto; max-width: 260px; font-size: 12.5px; padding: 5px 9px;
+  border-radius: var(--radius-sm);
+}
+.preset-cite {
+  font-size: 11px; color: var(--text-muted); line-height: 1.5;
+  margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--foam-50); border: 1px solid var(--border);
+}
+.preset-cite b { color: var(--text-2); font-weight: 650; }
+.preset-cite .src { display: block; margin-top: 4px; opacity: .85; }
