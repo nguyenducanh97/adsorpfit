@@ -6,6 +6,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- data-motion is set here, before the first paint, rather than when
+     Prefs initialises a few milliseconds later. The loading screen is
+     rendered in that gap, so deciding motion afterwards left its animation
+     to be governed by whatever the stylesheet did while the attribute was
+     missing. With the attribute always present there is one source of
+     truth, the CSS keys on it alone, and the operating system's
+     reduce-motion setting is consulted only to pick the default for a
+     first-time visitor, exactly as Prefs does. The two must agree, so if
+     you change the rule in js/prefs.js change it here too. -->
+<script>
+(function () {
+  var m = "full";
+  try {
+    var raw = localStorage.getItem("adsorpfit-prefs");
+    if (raw) {
+      m = (JSON.parse(raw) || {}).motion || "full";
+    } else if (window.matchMedia &&
+               window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      m = "off";
+    }
+  } catch (e) { m = "full"; }
+  document.documentElement.setAttribute("data-motion", m);
+})();
+</script>
 <title>AdsorpFit: Adsorption Kinetics, Isotherm & Thermodynamic Fitting</title>
 <meta name="description" content="Free browser-based fitting of adsorption kinetics, isotherm and thermodynamic data. 34 models, non-linear regression, publication-quality figures and automatic interpretation of every parameter. A product of SWAT Lab and UTOP.">
 <meta name="keywords" content="adsorption isotherm fitting, adsorption kinetics fitting, Langmuir, Freundlich, Sips, Redlich-Peterson, Temkin, pseudo-first-order, pseudo-second-order, Elovich, Avrami, intraparticle diffusion, van 't Hoff, thermodynamic parameters, adsorption calculator, non-linear regression">
@@ -39,8 +64,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<link rel="stylesheet" href="css/marks.css?v=38">
-<link rel="stylesheet" href="css/style.css?v=38">
+<link rel="stylesheet" href="css/marks.css?v=39">
+<link rel="stylesheet" href="css/style.css?v=39">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -677,13 +702,13 @@
 <!-- Bump APP_VERSION on every release. The ?v= query is what forces
      browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
      than serving a cached copy. -->
-<script>window.APP_VERSION = "38";</script>
-<script src="js/i18n.js?v=38"></script>
-<script src="js/prefs.js?v=38"></script>
-<script src="js/presets.js?v=38"></script>
-<script src="js/layout.js?v=38"></script>
-<script src="js/water.js?v=38"></script>
-<script src="js/plot.js?v=38"></script>
-<script src="js/app.js?v=38"></script>
+<script>window.APP_VERSION = "39";</script>
+<script src="js/i18n.js?v=39"></script>
+<script src="js/prefs.js?v=39"></script>
+<script src="js/presets.js?v=39"></script>
+<script src="js/layout.js?v=39"></script>
+<script src="js/water.js?v=39"></script>
+<script src="js/plot.js?v=39"></script>
+<script src="js/app.js?v=39"></script>
 </body>
 </html>
