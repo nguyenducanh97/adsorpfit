@@ -99,23 +99,36 @@ result rather than quietly reporting it.
 
 ## Example datasets
 
-The eight built-in examples are **real measured data**, not synthetic curves.
-They come from:
+The twenty-three built-in examples are **real measured data**, not synthetic
+curves and not figures read off with a ruler. Every one is the authors' own
+tabulated measurements, taken from a paper whose raw data were deposited under
+an open licence, and each carries its citation in the interface.
 
-> Wang, P., Liu, X., Yu, B., Wu, X., Xu, J., Dong, F. & Zheng, Y. (2021)
-> A comparative study on phosphate removal from water using *Phragmites
-> australis* biochars loaded with different metal oxides.
-> *Royal Society Open Science* **8**, 201789.
-> <https://doi.org/10.1098/rsos.201789> (open access)
->
-> Raw data: Wang, P. (2021) Zenodo. <https://doi.org/10.5281/zenodo.4711711>,
-> released under **CC0 1.0** (public domain dedication).
+Twelve isotherms, ten kinetic runs and one thermodynamic set, covering **five
+contaminants across nine adsorbents**:
 
-They were chosen to span behaviours rather than to flatter the tool: two
-isotherms that saturate cleanly, one that never plateaus, one failing adsorbent
-with negative measured uptake, and four kinetic runs ranging from a clean
-approach to equilibrium to one that finished before the first measurement.
-Each preset carries its citation in the interface.
+| Source | Contaminant | Adsorbents |
+| --- | --- | --- |
+| Wang *et al.* (2021) *R. Soc. Open Sci.* **8**, 201789 | phosphate | five metal-oxide biochars and the untreated biochar |
+| Zhang *et al.* (2018) *R. Soc. Open Sci.* **5**, 181266 | arsenic(V), fluoride | yak dung biochar, iron-modified |
+| Tao *et al.* (2020) *R. Soc. Open Sci.* **7**, 200857 | levofloxacin | cellulose nanocrystal / graphene oxide |
+| Xue *et al.* (2019) *R. Soc. Open Sci.* **6**, 182195 | cadmium(II) | mesoporous ceramic nanomaterial |
+
+Raw data for all four are deposited under **CC0 1.0** at Zenodo
+(<https://doi.org/10.5281/zenodo.4711711>) and Dryad
+(<https://doi.org/10.5061/dryad.kv63501>,
+<https://doi.org/10.5061/dryad.47d7wm39s>,
+<https://doi.org/10.5061/dryad.sg2637q>).
+
+They were chosen to span behaviours rather than to flatter the tool:
+isotherms that saturate cleanly and isotherms that never plateau; an adsorbent
+that fails outright and records negative uptake; kinetic runs that finished
+before the first measurement and others still climbing at the end; a published
+capacity obtained from a linearised plot that the non-linear fit does not
+support; and a tabulated rate constant that the paper's own deposited data
+contradict. The presets are generated from `validation/datasets/` by
+`tools/make_presets.py`, so the numbers in the interface and the numbers the
+validation suite refits are the same arrays.
 
 ---
 
@@ -200,11 +213,13 @@ produce the same markup.
 
 **A limitation, stated plainly.** Most adsorption papers still show raw
 (*t*, *q*t) and (*C*e, *q*e) data only as figures, with the numbers in
-supplementary files that subscription journals do not expose. Of roughly a dozen
-papers checked, one had its raw data openly deposited, which is why the
-literature suite rests on a single study (albeit six adsorbents and forty
-comparisons). More datasets in `validation/datasets/` would strengthen it
-further; the format is one small Python module per study.
+supplementary files that subscription journals do not expose. The literature
+suite therefore rests on the journals that mandate deposition: all four studies
+in it are *Royal Society Open Science*, which is where openly licensed raw
+adsorption data can actually be found. Sixty comparisons across four papers is
+better than the single study it started with, but it is not a survey of the
+field. More datasets in `validation/datasets/` would strengthen it further; the
+format is one small Python module per study.
 
 ---
 

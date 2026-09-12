@@ -160,6 +160,148 @@ check("La-BC flagged for having no early points",
       any(i["code"] == "sparse_early" for i in f.issues),
       "adsorption was complete within the first half hour")
 
+
+# ==========================================================================
+# Zhang 2018: fluoride and arsenic on yak dung biochar
+# ==========================================================================
+import zhang2018_fluoride_arsenic as Z
+
+print("\n" + "=" * 94)
+print("REFIT OF PUBLISHED RAW DATA")
+print(Z.CITATION)
+print("=" * 94)
+print("\nISOTHERMS   loadings reconstructed as q = (C0 - Ce) / 10 g/L\n")
+print("  %-14s %10s %10s %7s %9s" %
+      ("series", "published", "AdsorpFit", "dev", "our R2"))
+
+for key in (("F", "BC3"), ("F", "Fe-BC3"), ("As", "Fe-BC3"), ("As", "BC3")):
+    ce = np.array(Z.CE_ISOTHERM[key], float)
+    qe = np.array(Z.qe(key), float)
+    f = fit_model(ISOTHERM_MODELS["langmuir"], ce, qe, ctx={"T": 298.15},
+                  n_restarts=14)
+    pub = Z.PUBLISHED_LANGMUIR[key]["qm"]
+    dev = abs(f.params["qm"] - pub) / pub
+    print("  %-14s %10.4f %10.4f %6.1f%% %9.4f"
+          % ("%s on %s" % key, pub, f.params["qm"], dev * 100, f.stats["R2"]))
+    # Arsenic on the plain biochar never turns over, so its capacity is an
+    # extrapolation and is not expected to agree closely with a fitted
+    # value. It is checked through the diagnostic instead, just below.
+    if key != ("As", "BC3"):
+        check("%s on %s q_max" % key, dev <= 0.10,
+              "%.1f%% from published" % (dev * 100))
+
+f = fit_model(ISOTHERM_MODELS["langmuir"],
+              np.array(Z.CE_ISOTHERM[("As", "BC3")], float),
+              np.array(Z.qe(("As", "BC3")), float), ctx={})
+check("As on BC3 flagged as not plateauing",
+      any(i["code"] == "no_plateau" for i in f.issues),
+      "its capacity is an extrapolation, which is why it differs from the paper")
+
+print("\nKINETICS   pseudo-second-order q_e, times converted to minutes\n")
+print("  %-14s %10s %10s %9s" % ("series", "published", "AdsorpFit", "last q"))
+for key in (("F", "BC3"), ("F", "Fe-BC3"), ("As", "BC3"), ("As", "Fe-BC3")):
+    t = np.array([h * 60 for h in Z.T_KINETIC], float)
+    q = np.array(Z.qt(key), float)
+    f = fit_model(KINETIC_MODELS["pso"], t, q, ctx={}, n_restarts=14)
+    pub = Z.PUBLISHED_PSO_QE[key]
+    print("  %-14s %10.4f %10.4f %9.4f" %
+          ("%s on %s" % key, pub, f.params["qe"], q[-1]))
+    if key == ("As", "Fe-BC3"):
+        # The paper tabulates 1.069 mg/g, which its own deposited data
+        # cannot reach: the measured loading never exceeds 0.364. The fit
+        # has to follow the measurements rather than the table.
+        check("As on Fe-BC3 q_e follows the raw data, not the table",
+              abs(f.params["qe"] - q[-1]) / q[-1] <= 0.05,
+              "fitted %.4f against a measured plateau of %.4f, where the "
+              "paper prints %.3f" % (f.params["qe"], q[-1], pub))
+    else:
+        dev = abs(f.params["qe"] - pub) / pub
+        check("%s on %s q_e" % key, dev <= 0.20,
+              "%.1f%% from published" % (dev * 100))
+
+
+# ==========================================================================
+# Tao 2020: levofloxacin on cellulose nanocrystals / graphene oxide
+# ==========================================================================
+import tao2020_levofloxacin as TAO
+
+print("\n" + "=" * 94)
+print("REFIT OF PUBLISHED RAW DATA")
+print(TAO.CITATION)
+print("=" * 94)
+print("\nISOTHERMS at three temperatures   (Sips capacity)\n")
+print("  %-10s %10s %10s %8s" % ("T (K)", "published", "AdsorpFit", "our R2"))
+caps = []
+for T in TAO.TEMPERATURES:
+    d = TAO.ISOTHERMS[T]
+    f = fit_model(ISOTHERM_MODELS["sips"], np.array(d["ce"], float),
+                  np.array(d["qe"], float), ctx={"T": T}, n_restarts=16)
+    caps.append(f.params["qm"])
+    pub = TAO.PUBLISHED_SIPS_QMAX[T]
+    dev = abs(f.params["qm"] - pub) / pub
+    print("  %-10.2f %10.2f %10.2f %8.4f"
+          % (T, pub, f.params["qm"], f.stats["R2"]))
+    check("levofloxacin Sips q_max at %.2f K" % T, dev <= 0.01,
+          "%.2f%% from published" % (dev * 100))
+
+# The uptake rising with temperature is what makes a van 't Hoff analysis of
+# this set meaningful, and it is the reason it ships as the thermodynamic
+# example.
+check("levofloxacin capacity rises with temperature",
+      caps[0] < caps[1] < caps[2],
+      "%.2f < %.2f < %.2f mg/g, an endothermic signature" % tuple(caps))
+
+
+# ==========================================================================
+# Xue 2019: cadmium on a mesoporous ceramic, and the linearisation trap
+# ==========================================================================
+import xue2019_cadmium as XU
+from core import fit_linear
+
+print("\n" + "=" * 94)
+print("REFIT OF PUBLISHED RAW DATA")
+print(XU.CITATION)
+print("=" * 94)
+
+ce = np.array(XU.CE_ISOTHERM, float)
+qe = np.array(XU.QE_ISOTHERM, float)
+nl = fit_model(ISOTHERM_MODELS["langmuir"], ce, qe, ctx={"T": 298.15},
+               n_restarts=14)
+hanes = None
+for form in ISOTHERM_MODELS["langmuir"].linear_forms:
+    r = fit_linear(ISOTHERM_MODELS["langmuir"], form, ce, qe,
+                   ctx={"T": 298.15})
+    if r.success and "Hanes" in form.name:
+        hanes = r
+
+print("\n  published, from the linearised plot   q_max = %.2f, R2 = %.4f"
+      % (XU.PUBLISHED_LANGMUIR["qm"], XU.PUBLISHED_LANGMUIR["R2"]))
+print("  AdsorpFit non-linear                  q_max = %.2f, R2 = %.4f"
+      % (nl.params["qm"], nl.stats["R2"]))
+if hanes is not None:
+    print("  AdsorpFit Hanes linearisation         q_max = %.2f, "
+          "R2 of the line = %.4f, R2 on q = %.4f"
+          % (hanes.params["qm"], hanes.stats["R2_linear"], hanes.stats["R2"]))
+    dev = abs(hanes.params["qm"] - XU.PUBLISHED_LANGMUIR["qm"]) \
+        / XU.PUBLISHED_LANGMUIR["qm"]
+    check("cadmium: the linearised fit reproduces the published capacity",
+          dev <= 0.10, "%.1f%% from the published 97.09 mg/g" % (dev * 100))
+    check("cadmium: the straight line flatters the fit",
+          hanes.stats["R2_linear"] > hanes.stats["R2"] + 0.3,
+          "R2 = %.3f on the line against %.3f on the loadings"
+          % (hanes.stats["R2_linear"], hanes.stats["R2"]))
+    check("cadmium: the non-linear fit describes the loadings better",
+          nl.stats["R2"] > hanes.stats["R2"],
+          "non-linear R2 %.3f against %.3f for the linearised parameters"
+          % (nl.stats["R2"], hanes.stats["R2"]))
+
+f = fit_model(KINETIC_MODELS["pso"], np.array(XU.KINETIC_TIME, float),
+              np.array(XU.KINETIC_Q, float), ctx={}, n_restarts=14)
+check("cadmium kinetics q_e matches the measured plateau",
+      abs(f.params["qe"] - XU.KINETIC_Q[-1]) / XU.KINETIC_Q[-1] <= 0.05,
+      "fitted %.2f against a measured %.2f mg/g"
+      % (f.params["qe"], XU.KINETIC_Q[-1]))
+
 # --------------------------------------------------------------------------
 print("\n" + "=" * 94)
 print("RESULT: %d passed, %d failed" % (len(PASS), len(FAIL)))

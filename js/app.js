@@ -414,19 +414,51 @@
   function buildPresetPickers() {
     $$("[data-preset]").forEach(function (sel) {
       const cat = sel.dataset.preset;
+      const list = cat === "thermo" ? THERMO_PRESETS : PRESETS.filter(
+        function (p) {
+          return p.cat === (cat === "kinetics" ? "kinetics" : "isotherm");
+        });
       sel.innerHTML = "";
       sel.appendChild(el("option", { value: "",
                                      text: I18N.t("preset.choose") }));
-      PRESETS.filter(function (p) {
-        return p.cat === (cat === "kinetics" ? "kinetics" : "isotherm");
-      }).forEach(function (p) {
+      list.forEach(function (p) {
         const t = p[I18N.get()] || p.en;
         sel.appendChild(el("option", { value: p.id, text: t.name }));
       });
       sel.onchange = function () {
-        if (sel.value) loadPreset(cat, sel.value);
+        if (!sel.value) return;
+        if (cat === "thermo") loadThermoPreset(sel.value);
+        else loadPreset(cat, sel.value);
       };
     });
+  }
+
+  // A thermodynamic example is a set of isotherms rather than one series, so
+  // it replaces the whole list of temperature panels instead of filling a
+  // single textarea.
+  function loadThermoPreset(id) {
+    const p = THERMO_PRESETS.find(function (x) { return x.id === id; });
+    if (!p) return;
+    const t = p[I18N.get()] || p.en;
+
+    $("#th-datasets").innerHTML = "";
+    p.datasets.forEach(function (d) { addThermoDataset(d[0], d[1]); });
+    if (p.MW) $("#th-MW").value = p.MW;
+    // The isotherm model and the route to a dimensionless K are part of the
+    // example: on this dataset the two routes disagree, which is the point.
+    if (p.model) $("#th-model").value = p.model;
+    if (p.route) $("#th-route").value = p.route;
+
+    STATE.thermo.result = null;
+    $("#th-results").innerHTML = "";
+
+    const note = $("#th-preset-note");
+    if (note) {
+      note.hidden = false;
+      note.innerHTML = "<b>" + md(t.name) + ".</b> " + md(t.note) +
+                       "<span class='src'>" + md(p.cite) + "</span>";
+    }
+    toast(I18N.t("preset.loaded"), "good");
   }
 
   function loadPreset(cat, id) {
