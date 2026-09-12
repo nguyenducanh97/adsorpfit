@@ -113,7 +113,9 @@ def check_models():
 # --------------------------------------------------------------------------
 def check_presets():
     src = read("js/presets.js")
-    m = re.search(r"const PRESETS = (\[.*\]);", src, re.S)
+    # Non-greedy: presets.js now also defines THERMO_PRESETS, and a greedy
+    # match would run past the end of the first list into the second.
+    m = re.search(r"const PRESETS = (\[.*?\]);\n", src, re.S)
     if not m:
         add("ERROR", "presets", "could not parse the preset list")
         return
