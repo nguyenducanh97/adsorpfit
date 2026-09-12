@@ -20,6 +20,7 @@ import numpy as np
 
 from core import (ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue,
                   terminal_slope_ratio)
+from lang import tr
 
 # --------------------------------------------------------------------------
 # guess helpers
@@ -73,14 +74,16 @@ def _langmuir(ce, qm, kl):
 def _interp_langmuir(f, ctx):
     qm = f.params["qm"]; kl = f.params["KL"]
     out = [
-        f"The Langmuir monolayer capacity is q_max = {fmt(qm)} mg/g. This is the "
-        f"loading the surface would reach if every adsorption site were occupied. "
-        f"It is an extrapolated ceiling rather than a measured value, so it is "
-        f"only trustworthy if your data actually approach a plateau.",
-        f"The Langmuir affinity constant is K_L = {fmt(kl)} L/mg. Physically it is "
-        f"the ratio of the adsorption to the desorption rate constant, so a larger "
-        f"K_L means the adsorbate is held more tightly and the isotherm rises more "
-        f"steeply at low concentration.",
+        tr("The Langmuir monolayer capacity is q_max = {qm} mg/g. This is the "
+        "loading the surface would reach if every adsorption site were occupied. "
+        "It is an extrapolated ceiling rather than a measured value, so it is "
+        "only trustworthy if your data actually approach a plateau.",
+            qm=fmt(qm)),
+        tr("The Langmuir affinity constant is K_L = {kl} L/mg. Physically it is "
+        "the ratio of the adsorption to the desorption rate constant, so a larger "
+        "K_L means the adsorbate is held more tightly and the isotherm rises more "
+        "steeply at low concentration.",
+            kl=fmt(kl)),
     ]
     # coverage check - is the plateau actually observed?
     q_max_obs = float(np.max(f.y))
@@ -88,16 +91,18 @@ def _interp_langmuir(f, ctx):
     if np.isfinite(frac):
         if frac < 0.6:
             out.append(
-                f"Caution: your highest measured loading ({fmt(q_max_obs)} mg/g) is only "
-                f"{frac * 100:.0f}% of the fitted q_max. The plateau is far outside the "
-                f"measured range, so q_max here is an extrapolation with a large real "
-                f"uncertainty regardless of what the standard error says. Extend the "
-                f"concentration range before quoting this capacity."
+                tr("Caution: your highest measured loading ({q_max_obs} mg/g) is only "
+                "{v1:.0f}% of the fitted q_max. The plateau is far outside the "
+                "measured range, so q_max here is an extrapolation with a large real "
+                "uncertainty regardless of what the standard error says. Extend the "
+                "concentration range before quoting this capacity.",
+                    q_max_obs=fmt(q_max_obs), v1=frac * 100)
             )
         elif frac > 0.95:
             out.append(
-                f"Your data reach {frac * 100:.0f}% of the fitted q_max, so the plateau is "
-                f"genuinely observed and this capacity is well constrained."
+                tr("Your data reach {v1:.0f}% of the fitted q_max, so the plateau is "
+                "genuinely observed and this capacity is well constrained.",
+                    v1=frac * 100)
             )
     # separation factor
     c0 = ctx.get("C0_list") or ctx.get("C0")
@@ -107,26 +112,27 @@ def _interp_langmuir(f, ctx):
         f.derived["R_L"] = rl.tolist()
         lo, hi = float(np.min(rl)), float(np.max(rl))
         out.append(
-            f"The dimensionless separation factor R_L = 1/(1 + K_L·C_0) spans "
-            f"{fmt(lo)}–{fmt(hi)} over your initial concentrations. "
-            + ("All values fall in 0 < R_L < 1, which classifies the isotherm as "
+            tr("The dimensionless separation factor R_L = 1/(1 + K_L·C_0) spans "
+            "{lo}–{hi} over your initial concentrations. ",
+                lo=fmt(lo), hi=fmt(hi))
+            + (tr("All values fall in 0 < R_L < 1, which classifies the isotherm as "
                "favourable: the surface's affinity for the adsorbate is high enough "
-               "that uptake is efficient at low residual concentration."
+               "that uptake is efficient at low residual concentration.")
                if 0 < lo and hi < 1 else
-               "Values outside 0 < R_L < 1 indicate an unfavourable or irreversible "
-               "classification and usually mean K_L or C_0 has a unit problem.")
+               tr("Values outside 0 < R_L < 1 indicate an unfavourable or irreversible "
+               "classification and usually mean K_L or C_0 has a unit problem."))
         )
         if hi < 0.1:
             out.append(
-                "R_L below about 0.1 is the 'strongly favourable' regime: the isotherm "
+                tr("R_L below about 0.1 is the 'strongly favourable' regime: the isotherm "
                 "is close to rectangular, which is what you want for a practical "
-                "adsorbent because it strips the solute down to very low residual levels."
+                "adsorbent because it strips the solute down to very low residual levels.")
             )
     else:
         out.append(
-            "To report the separation factor R_L, enter the initial concentrations "
+            tr("To report the separation factor R_L, enter the initial concentrations "
             "C_0 in the experiment panel, R_L depends on C_0 and cannot be computed "
-            "from the equilibrium data alone."
+            "from the equilibrium data alone.")
         )
     return out
 
@@ -188,44 +194,48 @@ def _interp_freundlich(f, ctx):
     kf = f.params["KF"]; n = f.params["n"]
     inv = 1.0 / n if n else np.nan
     out = [
-        f"K_F = {fmt(kf)} (mg/g)(L/mg)^(1/n) measures the adsorption capacity, but "
-        f"note its units depend on n: so K_F values can only be compared between "
-        f"systems that have similar n. It is not a capacity in mg/g.",
-        f"The heterogeneity exponent is n = {fmt(n)} (1/n = {fmt(inv)}).",
+        tr("K_F = {kf} (mg/g)(L/mg)^(1/n) measures the adsorption capacity, but "
+        "note its units depend on n: so K_F values can only be compared between "
+        "systems that have similar n. It is not a capacity in mg/g.",
+            kf=fmt(kf)),
+        tr("The heterogeneity exponent is n = {n} (1/n = {inv}).",
+            n=fmt(n), inv=fmt(inv)),
     ]
     if inv < 1:
         out.append(
-            f"Because 1/n = {fmt(inv)} is below 1, the isotherm is favourable and "
-            f"concave to the concentration axis: the first molecules bind to the "
-            f"strongest sites, and the surface's affinity falls as those sites fill. "
-            f"The smaller 1/n is, the more energetically heterogeneous the surface."
+            tr("Because 1/n = {inv} is below 1, the isotherm is favourable and "
+            "concave to the concentration axis: the first molecules bind to the "
+            "strongest sites, and the surface's affinity falls as those sites fill. "
+            "The smaller 1/n is, the more energetically heterogeneous the surface.",
+                inv=fmt(inv))
         )
         if inv < 0.1:
             out.append(
-                "1/n below ~0.1 describes an almost irreversible isotherm; uptake is "
+                tr("1/n below ~0.1 describes an almost irreversible isotherm; uptake is "
                 "nearly independent of concentration over your range. Check that this "
-                "is not an artefact of too narrow a concentration window."
+                "is not an artefact of too narrow a concentration window.")
             )
     elif abs(inv - 1) < 0.05:
         out.append(
-            "With 1/n ≈ 1 the isotherm is effectively linear (Henry's law regime): "
+            tr("With 1/n ≈ 1 the isotherm is effectively linear (Henry's law regime): "
             "loading is proportional to concentration, which means either the surface "
             "is homogeneous and far from saturation, or your concentration range is "
-            "too low to probe site heterogeneity."
+            "too low to probe site heterogeneity.")
         )
     else:
         out.append(
-            f"1/n = {fmt(inv)} exceeds 1, giving an unfavourable, convex isotherm. "
-            f"This is the signature of cooperative adsorption, already-adsorbed "
-            f"molecules make further adsorption easier, as happens with surfactant "
-            f"hemimicelle formation or solute self-association on the surface. It is "
-            f"uncommon; check the data before claiming it."
+            tr("1/n = {inv} exceeds 1, giving an unfavourable, convex isotherm. "
+            "This is the signature of cooperative adsorption, already-adsorbed "
+            "molecules make further adsorption easier, as happens with surfactant "
+            "hemimicelle formation or solute self-association on the surface. It is "
+            "uncommon; check the data before claiming it.",
+                inv=fmt(inv))
         )
     out.append(
-        "The Freundlich model has no plateau: it predicts loading rising without "
+        tr("The Freundlich model has no plateau: it predicts loading rising without "
         "limit as Ce increases. That is physically impossible at high concentration, "
         "so never extrapolate it beyond your measured range, and do not quote a "
-        "'Freundlich capacity' as an adsorbent capacity."
+        "'Freundlich capacity' as an adsorbent capacity.")
     )
     return out
 
@@ -276,41 +286,47 @@ def _interp_temkin(f, ctx):
     B = R_GAS * T / bt
     f.derived["B"] = B
     out = [
-        f"A_T = {fmt(at)} L/g is the Temkin equilibrium binding constant, "
-        f"corresponding to the maximum binding energy.",
-        f"b_T = {fmt(bt)} J/mol is the Temkin constant related to the heat of "
-        f"adsorption, and B = RT/b_T = {fmt(B)} J/mol is the Temkin heat constant.",
-        f"The model's defining assumption is that the heat of adsorption of all "
-        f"molecules in the layer falls *linearly* with coverage, rather than "
-        f"logarithmically as Freundlich assumes, because of adsorbate–adsorbate "
-        f"repulsion. The fitted b_T = {fmt(bt)} J/mol is the magnitude of that decline.",
+        tr("A_T = {at} L/g is the Temkin equilibrium binding constant, "
+        "corresponding to the maximum binding energy.",
+            at=fmt(at)),
+        tr("b_T = {bt} J/mol is the Temkin constant related to the heat of "
+        "adsorption, and B = RT/b_T = {B} J/mol is the Temkin heat constant.",
+            bt=fmt(bt), B=fmt(B)),
+        tr("The model's defining assumption is that the heat of adsorption of all "
+        "molecules in the layer falls *linearly* with coverage, rather than "
+        "logarithmically as Freundlich assumes, because of adsorbate–adsorbate "
+        "repulsion. The fitted b_T = {bt} J/mol is the magnitude of that decline.",
+            bt=fmt(bt)),
     ]
     b_kj = bt / 1000.0
     if b_kj < 8:
         out.append(
-            f"b_T = {fmt(b_kj)} kJ/mol is below about 8 kJ/mol, which is usually read "
-            f"as physisorption; the interaction is weak, of the order of van der "
-            f"Waals or weak electrostatic attraction."
+            tr("b_T = {b_kj} kJ/mol is below about 8 kJ/mol, which is usually read "
+            "as physisorption; the interaction is weak, of the order of van der "
+            "Waals or weak electrostatic attraction.",
+                b_kj=fmt(b_kj))
         )
     elif b_kj < 16:
         out.append(
-            f"b_T = {fmt(b_kj)} kJ/mol falls in the 8–16 kJ/mol window often assigned "
-            f"to ion exchange or strong electrostatic interaction."
+            tr("b_T = {b_kj} kJ/mol falls in the 8–16 kJ/mol window often assigned "
+            "to ion exchange or strong electrostatic interaction.",
+                b_kj=fmt(b_kj))
         )
     else:
         out.append(
-            f"b_T = {fmt(b_kj)} kJ/mol exceeds ~16 kJ/mol, consistent with "
-            f"chemisorption involving genuine bond formation."
+            tr("b_T = {b_kj} kJ/mol exceeds ~16 kJ/mol, consistent with "
+            "chemisorption involving genuine bond formation.",
+                b_kj=fmt(b_kj))
         )
     out.append(
-        "Treat these energy bands as rough guidance, not proof of mechanism. They "
+        tr("Treat these energy bands as rough guidance, not proof of mechanism. They "
         "were derived for specific systems and are quoted far more confidently in "
-        "the literature than the underlying evidence supports."
+        "the literature than the underlying evidence supports.")
     )
     out.append(
-        "The Temkin equation is undefined as Ce → 0 (it predicts qe → −∞), so it "
+        tr("The Temkin equation is undefined as Ce → 0 (it predicts qe → −∞), so it "
         "should only be used over the mid-coverage range and never extrapolated to "
-        "dilute solution."
+        "dilute solution.")
     )
     return out
 
@@ -362,44 +378,50 @@ def _interp_dr(f, ctx):
     E = 1.0 / np.sqrt(2.0 * kad) / 1000.0 if kad > 0 else np.nan   # kJ/mol
     f.derived["E_kJ_mol"] = E
     out = [
-        f"q_s = {fmt(qs)} mg/g is the theoretical saturation capacity, which in the "
-        f"Dubinin–Radushkevich picture is the capacity for filling the *micropore "
-        f"volume* rather than for covering a surface as a monolayer. It is normally "
-        f"larger than the Langmuir q_max for the same data.",
-        f"K_ad = {fmt(kad)} mol²/J² is the activity coefficient related to the mean "
-        f"adsorption energy.",
-        f"The mean free energy of adsorption is E = 1/√(2·K_ad) = {fmt(E)} kJ/mol. "
-        f"This is the energy released when one mole of adsorbate is transferred to "
-        f"the surface from infinity in solution, and it is the parameter this model "
-        f"exists to deliver.",
+        tr("q_s = {qs} mg/g is the theoretical saturation capacity, which in the "
+        "Dubinin–Radushkevich picture is the capacity for filling the *micropore "
+        "volume* rather than for covering a surface as a monolayer. It is normally "
+        "larger than the Langmuir q_max for the same data.",
+            qs=fmt(qs)),
+        tr("K_ad = {kad} mol²/J² is the activity coefficient related to the mean "
+        "adsorption energy.",
+            kad=fmt(kad)),
+        tr("The mean free energy of adsorption is E = 1/√(2·K_ad) = {E} kJ/mol. "
+        "This is the energy released when one mole of adsorbate is transferred to "
+        "the surface from infinity in solution, and it is the parameter this model "
+        "exists to deliver.",
+            E=fmt(E)),
     ]
     if not np.isfinite(E):
-        out.append("E could not be computed because K_ad is not positive.")
+        out.append(tr("E could not be computed because K_ad is not positive."))
     elif E < 8:
         out.append(
-            f"E = {fmt(E)} kJ/mol is below 8 kJ/mol, which indicates **physisorption**"
-            f"the adsorbate is held by van der Waals forces, hydrogen bonding or weak "
-            f"electrostatics. Such adsorption is typically fast, fully reversible, and "
-            f"the adsorbent should regenerate easily."
+            tr("E = {E} kJ/mol is below 8 kJ/mol, which indicates **physisorption**, "
+            "the adsorbate is held by van der Waals forces, hydrogen bonding or weak "
+            "electrostatics. Such adsorption is typically fast, fully reversible, and "
+            "the adsorbent should regenerate easily.",
+                E=fmt(E))
         )
     elif E <= 16:
         out.append(
-            f"E = {fmt(E)} kJ/mol lies in the 8–16 kJ/mol band, the classical signature "
-            f"of **ion exchange**: the adsorbate displaces a counter-ion from the "
-            f"surface rather than forming a covalent bond."
+            tr("E = {E} kJ/mol lies in the 8–16 kJ/mol band, the classical signature "
+            "of **ion exchange**: the adsorbate displaces a counter-ion from the "
+            "surface rather than forming a covalent bond.",
+                E=fmt(E))
         )
     else:
         out.append(
-            f"E = {fmt(E)} kJ/mol is above 16 kJ/mol, pointing to **chemisorption**"
-            f"genuine chemical bond formation between adsorbate and surface. Expect "
-            f"slow kinetics, poor reversibility and difficult regeneration."
+            tr("E = {E} kJ/mol is above 16 kJ/mol, pointing to **chemisorption**, "
+            "genuine chemical bond formation between adsorbate and surface. Expect "
+            "slow kinetics, poor reversibility and difficult regeneration.",
+                E=fmt(E))
         )
     out.append(
-        "One caveat that most papers skip: the Polanyi potential used here, "
+        tr("One caveat that most papers skip: the Polanyi potential used here, "
         "ε = RT·ln(1 + 1/Ce), requires Ce in mol/L for E to come out in J/mol. "
         "AdsorpFit converts for you when you supply the molar mass; if you did not, "
         "the E value above inherits the units of your Ce and is not comparable with "
-        "published values."
+        "published values.")
     )
     return out
 
@@ -466,11 +488,12 @@ JOVANOVIC = ModelSpec(
         "saturation, but rises more sharply in between.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g and K_J = {fmt(f.params['KJ'])} L/mg.",
-        "Jovanović differs from Langmuir by allowing mechanical contact between "
+        tr("q_max = {qm} mg/g and K_J = {KJ} L/mg.",
+            qm=fmt(f.params['qm']), KJ=fmt(f.params['KJ'])),
+        tr("Jovanović differs from Langmuir by allowing mechanical contact between "
         "arriving and departing molecules. It reduces to Langmuir at low coverage "
         "and shares the same plateau, so if Jovanović fits much better than "
-        "Langmuir the difference is in the approach to saturation, not the capacity.",
+        "Langmuir the difference is in the approach to saturation, not the capacity."),
     ],
 )
 
@@ -500,14 +523,15 @@ HALSEY = ModelSpec(
         "with n_H = -n, so the two always give the same R².",
     ],
     interpretation=lambda f, c: [
-        f"K_H = {fmt(f.params['KH'])}, n_H = {fmt(f.params['nH'])}.",
-        "The Halsey equation is algebraically the Freundlich equation rewritten, "
+        tr("K_H = {KH}, n_H = {nH}.",
+            KH=fmt(f.params['KH']), nH=fmt(f.params['nH'])),
+        tr("The Halsey equation is algebraically the Freundlich equation rewritten, "
         "with n_H = −n. Its R² will therefore always equal the Freundlich R². "
         "Reporting both as independent evidence is double counting, a common "
-        "error in the literature.",
-        "Its stated purpose is different though: Halsey was derived for multilayer "
+        "error in the literature."),
+        tr("Its stated purpose is different though: Halsey was derived for multilayer "
         "condensation at some distance from the surface, so a good fit is read as "
-        "evidence of heteroporous multilayer adsorption.",
+        "evidence of heteroporous multilayer adsorption."),
     ],
     linear_forms=[
         LinearForm("ln qe vs ln Ce", "ln Ce", "ln qe",
@@ -546,13 +570,14 @@ HARKINS_JURA = ModelSpec(
         "Assumes the existence of a condensed film on the adsorbent surface.",
     ],
     interpretation=lambda f, c: [
-        f"A = {fmt(f.params['A'])}, B = {fmt(f.params['B'])}.",
-        "The Harkins–Jura constant A is taken as proportional to the adsorbent's "
+        tr("A = {A}, B = {B}.",
+            A=fmt(f.params['A']), B=fmt(f.params['B'])),
+        tr("The Harkins–Jura constant A is taken as proportional to the adsorbent's "
         "surface area, so a good fit is used as evidence for multilayer adsorption "
-        "across a heterogeneous distribution of pores.",
-        "This model is very often reported with a poor R². If yours fits badly, "
+        "across a heterogeneous distribution of pores."),
+        tr("This model is very often reported with a poor R². If yours fits badly, "
         "that is the normal result for solution-phase adsorption and is worth "
-        "stating rather than omitting.",
+        "stating rather than omitting."),
     ],
 )
 
@@ -588,19 +613,20 @@ BET = ModelSpec(
         "Requires the saturation concentration Cs, the solute's solubility limit.",
     ],
     interpretation=lambda f, c: [
-        f"Monolayer capacity q_s = {fmt(f.params['qs'])} mg/g; BET constant "
-        f"C_BET = {fmt(f.params['cb'])}.",
-        f"C_BET is the ratio of the first-layer binding constant to the "
-        f"condensation constant of the higher layers. "
-        + ("A large C_BET here says the first layer is bound far more strongly "
+        tr("Monolayer capacity q_s = {qs} mg/g; BET constant "
+        "C_BET = {cb}.",
+            qs=fmt(f.params['qs']), cb=fmt(f.params['cb'])),
+        tr("C_BET is the ratio of the first-layer binding constant to the "
+        "condensation constant of the higher layers. ")
+        + (tr("A large C_BET here says the first layer is bound far more strongly "
            "than subsequent ones, so the isotherm shows a clear knee at monolayer "
-           "completion (type II behaviour)."
+           "completion (type II behaviour).")
            if f.params['cb'] > 50 else
-           "A small C_BET means first-layer and multilayer energies are similar, so "
-           "there is no sharp monolayer point and q_s is poorly defined."),
-        "The liquid-phase BET model needs the solubility limit Cs. If you left it "
+           tr("A small C_BET means first-layer and multilayer energies are similar, so "
+           "there is no sharp monolayer point and q_s is poorly defined.")),
+        tr("The liquid-phase BET model needs the solubility limit Cs. If you left it "
         "at the default, q_s and C_BET are not physically meaningful; enter the "
-        "real saturation concentration in the experiment panel.",
+        "real saturation concentration in the experiment panel."),
     ],
 )
 
@@ -642,11 +668,12 @@ ELOVICH_ISO = ModelSpec(
         "Derived from a kinetic principle rather than an equilibrium one.",
     ],
     interpretation=lambda f, c: [
-        f"q_m = {fmt(f.params['qm'])} mg/g, K_E = {fmt(f.params['KE'])} L/mg.",
-        "The Elovich isotherm assumes the number of available sites grows "
+        tr("q_m = {qm} mg/g, K_E = {KE} L/mg.",
+            qm=fmt(f.params['qm']), KE=fmt(f.params['KE'])),
+        tr("The Elovich isotherm assumes the number of available sites grows "
         "exponentially with coverage, which implies multilayer adsorption. "
         "It is implicit in qe, so AdsorpFit solves it numerically at every point "
-        "rather than using the usual ln(qe/Ce) linear plot.",
+        "rather than using the usual ln(qe/Ce) linear plot."),
     ],
 )
 
@@ -664,34 +691,39 @@ def _sips(ce, qm, ks, ms):
 def _interp_sips(f, ctx):
     qm = f.params["qm"]; ks = f.params["Ks"]; ms = f.params["ms"]
     out = [
-        f"q_max = {fmt(qm)} mg/g is the saturation capacity. Because Sips has a real "
-        f"plateau (unlike Freundlich), this capacity is physically meaningful.",
-        f"K_s = {fmt(ks)} (L/mg)^m is the affinity constant and m_s = {fmt(ms)} is the "
-        f"heterogeneity index.",
-        "Sips (Langmuir–Freundlich) is a hybrid: it behaves like Freundlich at low "
+        tr("q_max = {qm} mg/g is the saturation capacity. Because Sips has a real "
+        "plateau (unlike Freundlich), this capacity is physically meaningful.",
+            qm=fmt(qm)),
+        tr("K_s = {ks} (L/mg)^m is the affinity constant and m_s = {ms} is the "
+        "heterogeneity index.",
+            ks=fmt(ks), ms=fmt(ms)),
+        tr("Sips (Langmuir–Freundlich) is a hybrid: it behaves like Freundlich at low "
         "concentration and like Langmuir at high concentration, which fixes "
         "Freundlich's unbounded growth while keeping its ability to describe a "
-        "heterogeneous surface.",
+        "heterogeneous surface."),
     ]
     if abs(ms - 1) < 0.05:
         out.append(
-            f"m_s = {fmt(ms)} is essentially 1, at which point Sips reduces exactly to "
-            f"the Langmuir equation. The surface is behaving as energetically "
-            f"homogeneous, and the third parameter is buying you nothing; prefer "
-            f"Langmuir on parsimony grounds."
+            tr("m_s = {ms} is essentially 1, at which point Sips reduces exactly to "
+            "the Langmuir equation. The surface is behaving as energetically "
+            "homogeneous, and the third parameter is buying you nothing; prefer "
+            "Langmuir on parsimony grounds.",
+                ms=fmt(ms))
         )
     elif ms < 1:
         out.append(
-            f"m_s = {fmt(ms)} < 1 indicates a heterogeneous surface. The further m_s "
-            f"falls below 1, the broader the distribution of site energies. This is "
-            f"the usual result for activated carbons, biochars and most natural "
-            f"adsorbents."
+            tr("m_s = {ms} < 1 indicates a heterogeneous surface. The further m_s "
+            "falls below 1, the broader the distribution of site energies. This is "
+            "the usual result for activated carbons, biochars and most natural "
+            "adsorbents.",
+                ms=fmt(ms))
         )
     else:
         out.append(
-            f"m_s = {fmt(ms)} > 1 implies positive cooperativity between adsorbed "
-            f"molecules. It is unusual: confirm it is not an artefact of a sparse "
-            f"high-concentration region."
+            tr("m_s = {ms} > 1 implies positive cooperativity between adsorbed "
+            "molecules. It is unusual: confirm it is not an artefact of a sparse "
+            "high-concentration region.",
+                ms=fmt(ms))
         )
     return out
 
@@ -732,23 +764,26 @@ def _toth(ce, qm, kt, nt):
 def _interp_toth(f, ctx):
     nt = f.params["nt"]
     out = [
-        f"q_max = {fmt(f.params['qm'])} mg/g, K_T = {fmt(f.params['KT'])} L/mg, "
-        f"n_T = {fmt(nt)}.",
-        "Tóth was designed to fix Langmuir's poor behaviour at both ends of the "
+        tr("q_max = {qm} mg/g, K_T = {KT} L/mg, "
+        "n_T = {nt}.",
+            qm=fmt(f.params['qm']), KT=fmt(f.params['KT']), nt=fmt(nt)),
+        tr("Tóth was designed to fix Langmuir's poor behaviour at both ends of the "
         "concentration range simultaneously. It satisfies the Henry's law limit as "
         "Ce → 0 and saturates correctly at high Ce, which is why it usually "
-        "outperforms Langmuir on wide-range data.",
+        "outperforms Langmuir on wide-range data."),
     ]
     if abs(nt - 1) < 0.05:
         out.append(
-            f"n_T = {fmt(nt)} ≈ 1 collapses Tóth to Langmuir. The surface is behaving "
-            f"homogeneously; the extra parameter is not earning its place."
+            tr("n_T = {nt} ≈ 1 collapses Tóth to Langmuir. The surface is behaving "
+            "homogeneously; the extra parameter is not earning its place.",
+                nt=fmt(nt))
         )
     else:
         out.append(
-            f"n_T = {fmt(nt)} departs from 1, and the size of that departure is the "
-            f"model's measure of surface heterogeneity, the further from 1, the more "
-            f"asymmetric the underlying distribution of site energies."
+            tr("n_T = {nt} departs from 1, and the size of that departure is the "
+            "model's measure of surface heterogeneity, the further from 1, the more "
+            "asymmetric the underlying distribution of site energies.",
+                nt=fmt(nt))
         )
     return out
 
@@ -789,36 +824,40 @@ def _redlich_peterson(ce, krp, arp, g):
 def _interp_rp(f, ctx):
     g = f.params["g"]; krp = f.params["KRP"]; arp = f.params["aRP"]
     out = [
-        f"K_RP = {fmt(krp)} L/g, a_RP = {fmt(arp)} (L/mg)^g, g = {fmt(g)}.",
-        "Redlich–Peterson is a three-parameter compromise that combines features of "
+        tr("K_RP = {krp} L/g, a_RP = {arp} (L/mg)^g, g = {g}.",
+            krp=fmt(krp), arp=fmt(arp), g=fmt(g)),
+        tr("Redlich–Peterson is a three-parameter compromise that combines features of "
         "Langmuir and Freundlich; the numerator is Langmuir-like and the "
-        "denominator's exponent g controls how the model interpolates between them.",
+        "denominator's exponent g controls how the model interpolates between them."),
     ]
     if abs(g - 1) < 0.05:
         out.append(
-            f"g = {fmt(g)} ≈ 1 reduces Redlich–Peterson exactly to the Langmuir "
-            f"equation, with q_max = K_RP/a_RP = {fmt(krp / arp) if arp else 'n.d.'} mg/g "
-            f"and K_L = a_RP = {fmt(arp)} L/mg. Report Langmuir instead: it gives the "
-            f"same fit with one fewer parameter."
+            tr("g = {g} ≈ 1 reduces Redlich–Peterson exactly to the Langmuir "
+            "equation, with q_max = K_RP/a_RP = {v1} mg/g "
+            "and K_L = a_RP = {arp} L/mg. Report Langmuir instead: it gives the "
+            "same fit with one fewer parameter.",
+                g=fmt(g), v1=fmt(krp / arp) if arp else 'n.d.', arp=fmt(arp))
         )
         if arp:
             f.derived["qmax_equiv"] = krp / arp
     elif g < 0.2:
         out.append(
-            f"g = {fmt(g)} is close to 0, where the model approaches Henry's law "
-            f"(linear partitioning). Your data are probably confined to the dilute, "
-            f"pre-saturation region."
+            tr("g = {g} is close to 0, where the model approaches Henry's law "
+            "(linear partitioning). Your data are probably confined to the dilute, "
+            "pre-saturation region.",
+                g=fmt(g))
         )
     else:
         out.append(
-            f"g = {fmt(g)} lies between 0 and 1, so the isotherm is genuinely "
-            f"intermediate between Langmuir and Freundlich behaviour, neither "
-            f"two-parameter model alone would capture it."
+            tr("g = {g} lies between 0 and 1, so the isotherm is genuinely "
+            "intermediate between Langmuir and Freundlich behaviour, neither "
+            "two-parameter model alone would capture it.",
+                g=fmt(g))
         )
     out.append(
-        "Note that Redlich–Peterson has no plateau unless g = 1, so K_RP is not a "
+        tr("Note that Redlich–Peterson has no plateau unless g = 1, so K_RP is not a "
         "capacity. Papers that quote K_RP in mg/g as an adsorption capacity are "
-        "making a unit error."
+        "making a unit error.")
     )
     return out
 
@@ -880,14 +919,16 @@ KHAN = ModelSpec(
         "Reduces to Langmuir at a_K = 1 and to Freundlich at high Ce with a_K < 1.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g, b_K = {fmt(f.params['bK'])} L/mg, "
-        f"a_K = {fmt(f.params['ak'])}.",
-        ("a_K ≈ 1, so Khan has collapsed to Langmuir; use Langmuir instead."
+        tr("q_max = {qm} mg/g, b_K = {bK} L/mg, "
+        "a_K = {ak}.",
+            qm=fmt(f.params['qm']), bK=fmt(f.params['bK']), ak=fmt(f.params['ak'])),
+        (tr("a_K ≈ 1, so Khan has collapsed to Langmuir; use Langmuir instead.")
          if abs(f.params['ak'] - 1) < 0.05 else
-         f"a_K = {fmt(f.params['ak'])} departs from 1, so the isotherm is "
-         f"Freundlich-like at the high-concentration end. Khan was formulated for "
-         f"multicomponent systems, so a strong Khan fit is sometimes taken as a "
-         f"hint that more than one solute species is competing for sites."),
+         tr("a_K = {ak} departs from 1, so the isotherm is "
+         "Freundlich-like at the high-concentration end. Khan was formulated for "
+         "multicomponent systems, so a strong Khan fit is sometimes taken as a "
+         "hint that more than one solute species is competing for sites.",
+             ak=fmt(f.params['ak']))),
     ],
 )
 
@@ -920,11 +961,12 @@ RADKE_PRAUSNITZ = ModelSpec(
         "and to Henry's law at m_RP = 0.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g, K_RP = {fmt(f.params['KRP'])} L/mg, "
-        f"m_RP = {fmt(f.params['mrp'])}.",
-        "Radke–Prausnitz was built for dilute solutions, so it is the model to "
+        tr("q_max = {qm} mg/g, K_RP = {KRP} L/mg, "
+        "m_RP = {mrp}.",
+            qm=fmt(f.params['qm']), KRP=fmt(f.params['KRP']), mrp=fmt(f.params['mrp'])),
+        tr("Radke–Prausnitz was built for dilute solutions, so it is the model to "
         "prefer when your data cluster at low Ce and you care about behaviour near "
-        "the origin rather than near saturation.",
+        "the origin rather than near saturation."),
     ],
 )
 
@@ -938,28 +980,32 @@ def _hill(ce, qsh, kd, nh):
 def _interp_hill(f, ctx):
     nh = f.params["nH"]
     out = [
-        f"q_SH = {fmt(f.params['qsh'])} mg/g is the Hill saturation capacity and "
-        f"K_D = {fmt(f.params['KD'])} is the Hill dissociation constant.",
-        f"The Hill coefficient is n_H = {fmt(nh)}. This is the model's whole point: "
-        f"it quantifies cooperativity between binding sites, an idea imported from "
-        f"ligand binding to macromolecules.",
+        tr("q_SH = {qsh} mg/g is the Hill saturation capacity and "
+        "K_D = {KD} is the Hill dissociation constant.",
+            qsh=fmt(f.params['qsh']), KD=fmt(f.params['KD'])),
+        tr("The Hill coefficient is n_H = {nh}. This is the model's whole point: "
+        "it quantifies cooperativity between binding sites, an idea imported from "
+        "ligand binding to macromolecules.",
+            nh=fmt(nh)),
     ]
     if nh > 1.05:
         out.append(
-            f"n_H = {fmt(nh)} > 1 means **positive cooperativity**: binding of the "
-            f"first molecules increases the affinity of the remaining sites. The "
-            f"isotherm is sigmoidal rather than concave."
+            tr("n_H = {nh} > 1 means **positive cooperativity**: binding of the "
+            "first molecules increases the affinity of the remaining sites. The "
+            "isotherm is sigmoidal rather than concave.",
+                nh=fmt(nh))
         )
     elif nh < 0.95:
         out.append(
-            f"n_H = {fmt(nh)} < 1 means **negative cooperativity**: each bound "
-            f"molecule makes subsequent binding harder, which is the behaviour "
-            f"expected on a heterogeneous surface where the best sites fill first."
+            tr("n_H = {nh} < 1 means **negative cooperativity**: each bound "
+            "molecule makes subsequent binding harder, which is the behaviour "
+            "expected on a heterogeneous surface where the best sites fill first.",
+                nh=fmt(nh))
         )
     else:
         out.append(
-            f"n_H ≈ 1 means **non-cooperative** binding, sites act independently, "
-            f"and Hill reduces to the Langmuir form."
+            tr("n_H ≈ 1 means **non-cooperative** binding, sites act independently, "
+            "and Hill reduces to the Langmuir form.")
         )
     return out
 
@@ -1020,17 +1066,18 @@ KOBLE_CORRIGAN = ModelSpec(
         "Saturation capacity is A/B.",
     ],
     interpretation=lambda f, c: [
-        f"A = {fmt(f.params['A'])}, B = {fmt(f.params['B'])}, n = {fmt(f.params['n'])}. "
-        f"The implied saturation capacity is A/B = "
-        f"{fmt(f.params['A'] / f.params['B']) if f.params['B'] else 'n.d.'} mg/g.",
-        ("n ≈ 1, so Koble–Corrigan has reduced to Langmuir."
+        tr("A = {A}, B = {B}, n = {n}. "
+        "The implied saturation capacity is A/B = "
+        "{v1} mg/g.",
+            A=fmt(f.params['A']), B=fmt(f.params['B']), n=fmt(f.params['n']), v1=fmt(f.params['A'] / f.params['B']) if f.params['B'] else 'n.d.'),
+        (tr("n ≈ 1, so Koble–Corrigan has reduced to Langmuir.")
          if abs(f.params['n'] - 1) < 0.05 else
-         ("n > 1 as required for thermodynamic consistency; the model is "
-          "describing a heterogeneous surface."
+         (tr("n > 1 as required for thermodynamic consistency; the model is "
+          "describing a heterogeneous surface.")
           if f.params['n'] > 1 else
-          "n < 1 here. Koble and Corrigan noted that n below 1 makes the model "
+          tr("n < 1 here. Koble and Corrigan noted that n below 1 makes the model "
           "thermodynamically inconsistent, so this fit should not be reported as "
-          "evidence of anything: another model describes these data better.")),
+          "evidence of anything: another model describes these data better."))),
     ],
 )
 
@@ -1064,15 +1111,17 @@ BROUERS_SOTOLONGO = ModelSpec(
         "Reduces to the Jovanović isotherm when α = 1.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g, K_BS = {fmt(f.params['KBS'])}, "
-        f"α = {fmt(f.params['alpha'])}.",
-        f"α is the fractal exponent describing the width of the site-energy "
-        f"distribution. "
-        + ("α ≈ 1 recovers the Jovanović isotherm, a narrow, near-uniform energy "
-           "distribution."
+        tr("q_max = {qm} mg/g, K_BS = {KBS}, "
+        "α = {alpha}.",
+            qm=fmt(f.params['qm']), KBS=fmt(f.params['KBS']), alpha=fmt(f.params['alpha'])),
+        tr("α is the fractal exponent describing the width of the site-energy "
+        "distribution. ")
+        + (tr("α ≈ 1 recovers the Jovanović isotherm, a narrow, near-uniform energy "
+           "distribution.")
            if abs(f.params['alpha'] - 1) < 0.05 else
-           f"α = {fmt(f.params['alpha'])} indicates a broad distribution of site "
-           f"energies; the further α is from 1, the more heterogeneous the surface."),
+           tr("α = {alpha} indicates a broad distribution of site "
+           "energies; the further α is from 1, the more heterogeneous the surface.",
+               alpha=fmt(f.params['alpha']))),
     ],
 )
 
@@ -1110,12 +1159,13 @@ VIETH_SLADEK = ModelSpec(
         "with both a dissolution and a site-binding mechanism.",
     ],
     interpretation=lambda f, c: [
-        f"Henry constant k_VS = {fmt(f.params['kVS'])} L/g; Langmuir part "
-        f"q_max = {fmt(f.params['qm'])} mg/g, b = {fmt(f.params['b'])} L/mg.",
-        "Vieth–Sladek splits uptake into a linear 'dissolution' term and a "
+        tr("Henry constant k_VS = {kVS} L/g; Langmuir part "
+        "q_max = {qm} mg/g, b = {b} L/mg.",
+            kVS=fmt(f.params['kVS']), qm=fmt(f.params['qm']), b=fmt(f.params['b'])),
+        tr("Vieth–Sladek splits uptake into a linear 'dissolution' term and a "
         "saturable site-binding term. A large k_VS relative to the Langmuir term "
         "says partitioning into the bulk of the solid dominates; a small one says "
-        "surface site binding does.",
+        "surface site binding does."),
     ],
 )
 
@@ -1156,17 +1206,18 @@ FRITZ_SCHLUNDER = ModelSpec(
         "fit weak evidence for anything mechanistic.",
     ],
     interpretation=lambda f, c: [
-        f"A = {fmt(f.params['A'])}, B = {fmt(f.params['B'])}, "
-        f"α = {fmt(f.params['alpha'])}, β = {fmt(f.params['beta'])}.",
-        ("α ≈ β, which means Fritz–Schlünder has reduced to the Sips equation. "
-         "Fit Sips instead and save two parameters."
+        tr("A = {A}, B = {B}, "
+        "α = {alpha}, β = {beta}.",
+            A=fmt(f.params['A']), B=fmt(f.params['B']), alpha=fmt(f.params['alpha']), beta=fmt(f.params['beta'])),
+        (tr("α ≈ β, which means Fritz–Schlünder has reduced to the Sips equation. "
+         "Fit Sips instead and save two parameters.")
          if abs(f.params['alpha'] - f.params['beta']) < 0.05 else
-         "α and β differ, so the model is using its full flexibility to bend the "
-         "isotherm's low- and high-concentration ends independently."),
-        "Be careful how you present this result. With four adjustable parameters "
+         tr("α and β differ, so the model is using its full flexibility to bend the "
+         "isotherm's low- and high-concentration ends independently.")),
+        tr("Be careful how you present this result. With four adjustable parameters "
         "Fritz–Schlünder will fit almost any monotonic dataset, so a high R² is "
         "close to guaranteed and carries little mechanistic information. Compare it "
-        "to simpler models on AICc, not on R².",
+        "to simpler models on AICc, not on R²."),
     ],
 )
 
@@ -1201,20 +1252,22 @@ BAUDU = ModelSpec(
         "between 0 and 1.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g, b_0 = {fmt(f.params['b0'])} L/mg, "
-        f"x = {fmt(f.params['x'])}, y = {fmt(f.params['y'])}.",
-        "Baudu generalises Langmuir by letting the affinity constant itself depend "
+        tr("q_max = {qm} mg/g, b_0 = {b0} L/mg, "
+        "x = {x}, y = {y}.",
+            qm=fmt(f.params['qm']), b0=fmt(f.params['b0']), x=fmt(f.params['x']), y=fmt(f.params['y'])),
+        tr("Baudu generalises Langmuir by letting the affinity constant itself depend "
         "on coverage: which is why it captures isotherms that Langmuir's fixed "
-        "affinity cannot.",
-        ("Validity check passed: 1 + x + y = "
-         f"{fmt(1 + f.params['x'] + f.params['y'])} and 1 + x = "
-         f"{fmt(1 + f.params['x'])} both lie in (0, 1), as the model requires."
+        "affinity cannot."),
+        (tr("Validity check passed: 1 + x + y = "
+         "{v2} and 1 + x = "
+         "{v1} both lie in (0, 1), as the model requires.",
+            v2=fmt(1 + f.params['x'] + f.params['y']), v1=fmt(1 + f.params['x']))
          if 0 < 1 + f.params['x'] + f.params['y'] < 1
          and 0 < 1 + f.params['x'] < 1 else
-         "Validity check FAILED: the Baudu model requires both 1 + x + y and 1 + x "
+         tr("Validity check FAILED: the Baudu model requires both 1 + x + y and 1 + x "
          "to lie between 0 and 1. Your fitted values fall outside that range, so "
          "these parameters are outside the model's domain of applicability and "
-         "should not be reported."),
+         "should not be reported.")),
     ],
 )
 
@@ -1252,17 +1305,18 @@ MARCZEWSKI_JARONIEC = ModelSpec(
         "m = n = 1.",
     ],
     interpretation=lambda f, c: [
-        f"q_max = {fmt(f.params['qm'])} mg/g, K = {fmt(f.params['K'])} L/mg, "
-        f"m = {fmt(f.params['m'])}, n = {fmt(f.params['n'])}.",
-        "m and n independently shape the two tails of the underlying site-energy "
+        tr("q_max = {qm} mg/g, K = {K} L/mg, "
+        "m = {m}, n = {n}.",
+            qm=fmt(f.params['qm']), K=fmt(f.params['K']), m=fmt(f.params['m']), n=fmt(f.params['n'])),
+        tr("m and n independently shape the two tails of the underlying site-energy "
         "distribution: this is the model's advantage over Sips, which forces both "
-        "tails to share one exponent.",
-        ("m ≈ n, so the distribution is symmetric and the model has reduced to "
-         "Sips. Use Sips instead."
+        "tails to share one exponent."),
+        (tr("m ≈ n, so the distribution is symmetric and the model has reduced to "
+         "Sips. Use Sips instead.")
          if abs(f.params['m'] - f.params['n']) < 0.05 else
-         f"m ≠ n, so the site-energy distribution is asymmetric: "
-         + ("the low-energy tail is broader." if f.params['m'] < f.params['n']
-            else "the high-energy tail is broader.")),
+         tr("m ≠ n, so the site-energy distribution is asymmetric: ")
+         + (tr("the low-energy tail is broader.") if f.params['m'] < f.params['n']
+            else tr("the high-energy tail is broader."))),
     ],
 )
 
@@ -1282,15 +1336,16 @@ def _temkin_domain(x, y, ctx):
     lo, hi = float(np.min(x)), float(np.max(x))
     if lo <= 0:
         return [issue("block", "temkin_zero",
-                      "The Temkin equation contains ln(A_T·C_e) and is undefined "
-                      "at C_e = 0.")]
+                      tr("The Temkin equation contains ln(A_T·C_e) and is undefined "
+                      "at C_e = 0."))]
     if hi / lo > 100:
         out.append(issue(
             "warn", "temkin_wide_range",
-            f"Your concentrations span {hi / lo:.0f}-fold ({fmt(lo)} to {fmt(hi)}). "
-            f"Temkin is a mid-coverage approximation; it has no plateau at high "
-            f"C_e and diverges to −∞ as C_e → 0, so over a range this wide it is "
-            f"likely to misrepresent at least one end."))
+            tr("Your concentrations span {v1:.0f}-fold ({lo} to {hi}). "
+            "Temkin is a mid-coverage approximation; it has no plateau at high "
+            "C_e and diverges to −∞ as C_e → 0, so over a range this wide it is "
+            "likely to misrepresent at least one end.",
+                v1=hi / lo, lo=fmt(lo), hi=fmt(hi))))
     return out
 
 
@@ -1308,20 +1363,22 @@ def _temkin_validity(p, x, y, ctx):
     if below:
         return [issue(
             "block", "temkin_below_threshold",
-            f"With the fitted A_T = {fmt(at)} L/g, the Temkin equation predicts a "
-            f"negative q_e for any C_e below 1/A_T = {fmt(c_min)} mg/L. "
-            f"{below} of your {len(x)} points fall in that region, so the model is "
-            f"being extrapolated outside its own domain. Either drop the dilute "
-            f"points and refit over the mid-coverage range Temkin was derived for, "
-            f"or use a model that is bounded below, Langmuir, Sips or Tóth all "
-            f"behave correctly as C_e → 0.")]
+            tr("With the fitted A_T = {at} L/g, the Temkin equation predicts a "
+            "negative q_e for any C_e below 1/A_T = {c_min} mg/L. "
+            "{below} of your {v1} points fall in that region, so the model is "
+            "being extrapolated outside its own domain. Either drop the dilute "
+            "points and refit over the mid-coverage range Temkin was derived for, "
+            "or use a model that is bounded below, Langmuir, Sips or Tóth all "
+            "behave correctly as C_e → 0.",
+                at=fmt(at), c_min=fmt(c_min), below=below, v1=len(x)))]
     margin = c_min / float(np.min(x))
     if margin > 0.5:
         return [issue(
             "warn", "temkin_near_threshold",
-            f"Your lowest point (C_e = {fmt(float(np.min(x)))}) sits close to the "
-            f"threshold 1/A_T = {fmt(c_min)} below which Temkin turns negative. "
-            f"The fit is valid, but do not extrapolate it to lower concentrations.")]
+            tr("Your lowest point (C_e = {v1}) sits close to the "
+            "threshold 1/A_T = {c_min} below which Temkin turns negative. "
+            "The fit is valid, but do not extrapolate it to lower concentrations.",
+                v1=fmt(float(np.min(x))), c_min=fmt(c_min)))]
     return []
 
 
@@ -1339,11 +1396,12 @@ def _harkins_jura_validity(p, x, y, ctx):
     if above:
         return [issue(
             "block", "hj_above_threshold",
-            f"The Harkins–Jura equation contains 1/(B − log C_e) and is undefined "
-            f"once C_e reaches 10^B = {fmt(c_max)} mg/L. {above} of your "
-            f"{len(x)} points are at or beyond that, where the model has no value "
-            f"to return. Those points cannot constrain the fit, so the reported "
-            f"statistics describe only the remaining ones.")]
+            tr("The Harkins–Jura equation contains 1/(B − log C_e) and is undefined "
+            "once C_e reaches 10^B = {c_max} mg/L. {above} of your "
+            "{v1} points are at or beyond that, where the model has no value "
+            "to return. Those points cannot constrain the fit, so the reported "
+            "statistics describe only the remaining ones.",
+                c_max=fmt(c_max), above=above, v1=len(x)))]
     return []
 
 
@@ -1353,24 +1411,26 @@ def _bet_domain(x, y, ctx):
     if not cs:
         return [issue(
             "warn", "bet_no_cs",
-            "The liquid-phase BET model needs the adsorbate's saturation "
+            tr("The liquid-phase BET model needs the adsorbate's saturation "
             "concentration C_s (its solubility limit). Without it a placeholder is "
             "used and neither q_s nor C_BET means anything. Enter C_s in the "
-            "experiment panel.")]
+            "experiment panel."))]
     if hi >= float(cs):
         return [issue(
             "block", "bet_above_cs",
-            f"Your highest C_e ({fmt(hi)} mg/L) is at or above the saturation "
-            f"concentration C_s = {fmt(float(cs))} mg/L. BET contains (C_s − C_e) "
-            f"in its denominator and diverges there; the solution would be "
-            f"supersaturated, which is outside the model's physical premise.")]
+            tr("Your highest C_e ({hi} mg/L) is at or above the saturation "
+            "concentration C_s = {cs} mg/L. BET contains (C_s − C_e) "
+            "in its denominator and diverges there; the solution would be "
+            "supersaturated, which is outside the model's physical premise.",
+                hi=fmt(hi), cs=fmt(float(cs))))]
     if hi / float(cs) < 0.05:
         return [issue(
             "warn", "bet_far_from_cs",
-            f"Your data reach only {100 * hi / float(cs):.1f}% of the saturation "
-            f"concentration. BET describes multilayer build-up, which only becomes "
-            f"significant as C_e approaches C_s, so there is little multilayer "
-            f"behaviour here for the model to detect.")]
+            tr("Your data reach only {v1:.1f}% of the saturation "
+            "concentration. BET describes multilayer build-up, which only becomes "
+            "significant as C_e approaches C_s, so there is little multilayer "
+            "behaviour here for the model to detect.",
+                v1=100 * hi / float(cs)))]
     return []
 
 
@@ -1378,8 +1438,9 @@ def _needs_positive_x(name):
     def f(x, y, ctx):
         if np.any(np.asarray(x) <= 0):
             return [issue("block", "nonpositive_x",
-                          f"The {name} equation is logarithmic in C_e and is "
-                          f"undefined at C_e = 0.")]
+                          tr("The {name} equation is logarithmic in C_e and is "
+                          "undefined at C_e = 0.",
+                              name=name))]
         return []
     return f
 
@@ -1408,13 +1469,14 @@ def _plateau_domain(x, y, ctx):
     if ratio > 0.25 or rise > 0.25:
         return [issue(
             "warn", "no_plateau",
-            f"Your isotherm is still rising at the highest concentration: the "
-            f"slope over the final quarter of the range is {ratio * 100:.0f}% of "
-            f"the average slope, and the top third of the data accounts for "
-            f"{rise * 100:.0f}% of the total change in q_e. At saturation both "
-            f"would be near zero. A capacity fitted to data that never plateau is "
-            f"an extrapolation rather than a measurement, so extend the "
-            f"concentration range if q_max is the number you want to report.")]
+            tr("Your isotherm is still rising at the highest concentration: the "
+            "slope over the final quarter of the range is {v2:.0f}% of "
+            "the average slope, and the top third of the data accounts for "
+            "{v1:.0f}% of the total change in q_e. At saturation both "
+            "would be near zero. A capacity fitted to data that never plateau is "
+            "an extrapolation rather than a measurement, so extend the "
+            "concentration range if q_max is the number you want to report.",
+                v2=ratio * 100, v1=rise * 100))]
     return []
 
 
@@ -1423,10 +1485,11 @@ def _baudu_validity(p, x, y, ctx):
     if not (0 < a < 1 and 0 < b < 1):
         return [issue(
             "block", "baudu_domain",
-            f"The Baudu model requires both 1+x+y and 1+x to lie strictly between "
-            f"0 and 1. The fit gives 1+x+y = {fmt(a)} and 1+x = {fmt(b)}, so these "
-            f"parameters are outside the model's stated domain of applicability "
-            f"and should not be reported.")]
+            tr("The Baudu model requires both 1+x+y and 1+x to lie strictly between "
+            "0 and 1. The fit gives 1+x+y = {a} and 1+x = {b}, so these "
+            "parameters are outside the model's stated domain of applicability "
+            "and should not be reported.",
+                a=fmt(a), b=fmt(b)))]
     return []
 
 
@@ -1435,9 +1498,10 @@ def _koble_validity(p, x, y, ctx):
     if n < 1:
         return [issue(
             "warn", "koble_n_lt_1",
-            f"Koble and Corrigan noted that n must be at least 1 for the model to "
-            f"be thermodynamically consistent. The fit gives n = {fmt(n)}, below "
-            f"that limit, which means another model describes these data better.")]
+            tr("Koble and Corrigan noted that n must be at least 1 for the model to "
+            "be thermodynamically consistent. The fit gives n = {n}, below "
+            "that limit, which means another model describes these data better.",
+                n=fmt(n)))]
     return []
 
 
@@ -1445,10 +1509,10 @@ def _dr_domain(x, y, ctx):
     if not ctx.get("MW"):
         return [issue(
             "info", "dr_units",
-            "The Polanyi potential ε = RT·ln(1 + 1/C_e) requires C_e in mol/L for "
+            tr("The Polanyi potential ε = RT·ln(1 + 1/C_e) requires C_e in mol/L for "
             "the mean free energy E to come out in J/mol. Enter the adsorbate "
             "molar mass and AdsorpFit will convert; without it, E carries the units "
-            "of your C_e and is not comparable with published values.")]
+            "of your C_e and is not comparable with published values."))]
     return []
 
 

@@ -21,6 +21,7 @@ from core import (ModelSpec, fit_model, fit_linear, rank_models, statistics,
                   R_GAS, fmt)
 from isotherms import ISOTHERM_MODELS
 from kinetics import KINETIC_MODELS, boyd_bt
+from lang import tr, set_lang
 import thermo as th
 import advisor as adv
 
@@ -101,6 +102,16 @@ def unit_to_tex(unit: str) -> str:
                    lambda m, w=word: r"\mathrm{" + w + "}", t)
     return t
 
+def set_language(code: str = "en") -> str:
+    """Choose the language of everything generated from here on.
+
+    The interface translates itself through data-i18n attributes, but the
+    interpretation paragraphs and warnings are written here with the fitted
+    numbers inside them, so the Python side has to be told too.
+    """
+    return _ok({"lang": set_lang((code or "en").strip().strip('"'))})
+
+
 def list_models(category: str = "all") -> str:
     """Return the full metadata catalogue for the model picker."""
     out = []
@@ -108,11 +119,11 @@ def list_models(category: str = "all") -> str:
         if category not in ("all", m.category):
             continue
         out.append({
-            "key": key, "name": m.name, "category": m.category,
+            "key": key, "name": tr(m.name), "category": m.category,
             "family": m.family, "n_params": m.n_params,
             "equation": m.equation, "equation_plain": m.equation_plain,
             "citation": m.citation, "year": m.year,
-            "assumptions": m.assumptions,
+            "assumptions": [tr(a) for a in m.assumptions],
             "requires": m.requires,
             "notes": m.notes,
             "params": [{
@@ -164,8 +175,9 @@ def fit(payload_json: str) -> str:
         criterion = p.get("criterion", "AICc")
 
         if x.size != y.size:
-            return _err(f"x has {x.size} values but y has {y.size}. "
-                        f"Every point needs both a concentration/time and a q value.")
+            return _err(tr("x has {size2} values but y has {size}. "
+                        "Every point needs both a concentration/time and a q value.",
+                size2=x.size, size=y.size))
         if x.size < 3:
             return _err("At least 3 data points are needed to fit anything "
                         "meaningfully.")
@@ -183,11 +195,13 @@ def fit(payload_json: str) -> str:
                 r = fit_model(spec, x, y, ctx=ctx, weights=weights)
             except Exception as exc:
                 payload_models.append({
-                    "model_key": key, "model_name": spec.name, "success": False,
-                    "message": f"This model could not be fitted to these data: {exc}",
+                    "model_key": key, "model_name": tr(spec.name), "success": False,
+                    "message": tr("This model could not be fitted to these data: {exc}",
+                        exc=exc),
                     "category": spec.category, "family": spec.family,
                     "equation": spec.equation, "equation_plain": spec.equation_plain,
-                    "citation": spec.citation, "assumptions": spec.assumptions,
+                    "citation": spec.citation,
+                    "assumptions": [tr(a) for a in spec.assumptions],
                     "params": {}, "stderr": {}, "ci95": {}, "tvalue": {},
                     "pvalue": {}, "stats": {}, "warnings": [], "issues": [],
                     "param_meta": [{"key": q.key, "symbol": q.symbol,
@@ -202,9 +216,10 @@ def fit(payload_json: str) -> str:
             entry = _result_to_dict(r, spec, ctx)
             if missing:
                 entry["warnings"] = entry.get("warnings", []) + [
-                    f"This model needs {', '.join(missing)} from the experiment "
-                    f"panel. A default was used, so the parameters are not on a "
-                    f"physical scale."]
+                    tr("This model needs {v1} from the experiment "
+                    "panel. A default was used, so the parameters are not on a "
+                    "physical scale.",
+                        v1=', '.join(missing))]
 
             if also_linear and spec.linear_forms:
                 entry["linear"] = []
@@ -216,8 +231,9 @@ def fit(payload_json: str) -> str:
                             "form_name": lf.name, "success": False,
                             "x_label": lf.x_label, "y_label": lf.y_label,
                             "note": lf.note, "params": {}, "stats": {},
-                            "message": f"This linearisation is not defined for "
-                                       f"these data: {exc}",
+                            "message": tr("This linearisation is not defined for "
+                                       "these data: {exc}",
+                                exc=exc),
                         })
                         continue
                     d = _result_to_dict(lr, spec, ctx, with_curve=False)
@@ -278,7 +294,8 @@ def _result_to_dict(r, spec, ctx, with_curve=True):
         "warnings": list(r.warnings),
         "issues": list(r.issues),
         "equation": spec.equation, "equation_plain": spec.equation_plain,
-        "citation": spec.citation, "assumptions": spec.assumptions,
+        "citation": spec.citation,
+        "assumptions": [tr(a) for a in spec.assumptions],
         "family": spec.family, "category": spec.category,
         "param_meta": [{"key": p.key, "symbol": p.symbol, "tex": p.symbol_tex,
                         "unit": p.unit, "unit_tex": unit_to_tex(p.unit),
@@ -307,44 +324,45 @@ def _result_to_dict(r, spec, ctx, with_curve=True):
 def _ranking_prose(ranking, results):
     """Write the model-comparison paragraph."""
     if not ranking:
-        return ["No model converged, so there is nothing to rank."]
+        return [tr("No model converged, so there is nothing to rank.")]
     best = ranking[0]
     lines = [
-        f"**{best['model_name']}** ranks first on {best['criterion']} "
-        f"({best['criterion']} = {best['value']:.2f}, Akaike weight "
-        f"{best['weight'] * 100:.0f}%), with R² = {best['R2']:.4f} and RMSE = "
-        f"{best['RMSE']:.4g}."
+        tr("**{name}** ranks first on {crit} ({crit} = {value:.2f}, Akaike "
+           "weight {weight:.0f}%), with R² = {r2:.4f} and RMSE = {rmse:.4g}.",
+           name=best["model_name"], crit=best["criterion"],
+           value=best["value"], weight=best["weight"] * 100,
+           r2=best["R2"], rmse=best["RMSE"])
     ]
     close = [r for r in ranking[1:] if r["delta"] < 2]
     if close:
         names = ", ".join(r["model_name"] for r in close)
-        lines.append(
-            f"However, {names} {'is' if len(close) == 1 else 'are'} statistically "
-            f"indistinguishable from it (ΔAICc < 2). On these data you cannot "
-            f"claim one of these models is correct and the others are not, say "
-            f"they describe the data equally well, and choose between them on "
-            f"physical grounds rather than on fit statistics."
-        )
+        lines.append(tr(
+            "However, {names} cannot be distinguished from it statistically "
+            "(ΔAICc < 2). On these data you cannot claim one of these models "
+            "is correct and the others are not. Say they describe the data "
+            "equally well, and choose between them on physical grounds rather "
+            "than on fit statistics.", names=names))
     else:
         second = ranking[1] if len(ranking) > 1 else None
         if second:
-            lines.append(
-                f"The next best model, {second['model_name']}, is Δ = "
-                f"{second['delta']:.1f} behind: {second['evidence']}. The margin "
-                f"is large enough to prefer {best['model_name']} on statistical "
-                f"grounds."
-            )
+            lines.append(tr(
+                "The next best model, {name}, is Δ = {delta:.1f} behind: "
+                "{evidence}. The margin is large enough to prefer {best} on "
+                "statistical grounds.",
+                name=second["model_name"], delta=second["delta"],
+                evidence=second["evidence"], best=best["model_name"]))
     # the R2 trap
     by_r2 = sorted(ranking, key=lambda r: -(r["R2"] if r["R2"] is not None else -9))
     if by_r2[0]["model_key"] != best["model_key"]:
-        lines.append(
-            f"Note that {by_r2[0]['model_name']} has the highest raw R² "
-            f"({by_r2[0]['R2']:.4f}) but uses {by_r2[0]['n_params']} parameters "
-            f"against {best['n_params']} for {best['model_name']}. R² can only "
-            f"increase when parameters are added, so ranking models by R² "
-            f"systematically favours the most complex one. AICc penalises that "
-            f"and is the criterion to report."
-        )
+        lines.append(tr(
+            "Note that {name} has the highest raw R² ({r2:.4f}) but uses {np} "
+            "parameters against {nb} for {best}. R² can only increase when "
+            "parameters are added, so ranking models by R² systematically "
+            "favours the most complex one. AICc penalises that and is the "
+            "criterion to report.",
+            name=by_r2[0]["model_name"], r2=by_r2[0]["R2"],
+            np=by_r2[0]["n_params"], nb=best["n_params"],
+            best=best["model_name"]))
     return lines
 
 
@@ -384,8 +402,9 @@ def diffusion_analysis(payload_json: str) -> str:
                    if np.isfinite(lr.intercept_stderr) else abs(lr.intercept) > 0.1)
             boyd["through_origin"] = not sig
             boyd["interpretation"] = (
-                f"The Boyd plot has intercept {fmt(lr.intercept)} ± "
-                f"{fmt(lr.intercept_stderr)} and R² = {lr.rvalue ** 2:.4f}. "
+                tr("The Boyd plot has intercept {intercept} ± "
+                "{intercept_stderr} and R² = {v1:.4f}. ",
+                    intercept=fmt(lr.intercept), intercept_stderr=fmt(lr.intercept_stderr), v1=lr.rvalue ** 2)
                 + ("The intercept is not statistically distinguishable from zero, "
                    "so the line passes through the origin: **intraparticle "
                    "(pore) diffusion** controls the rate."
@@ -402,9 +421,10 @@ def diffusion_analysis(payload_json: str) -> str:
                     Di = lr.slope * (float(r) ** 2) / (np.pi ** 2)
                     boyd["Di"] = Di
                     boyd["interpretation"] += (
-                        f" From the slope B = {fmt(lr.slope)} min⁻¹ and a particle "
-                        f"radius of {r} cm, the effective diffusion coefficient is "
-                        f"D_i = B·r²/π² = {fmt(Di)} cm²/min.")
+                        tr(" From the slope B = {slope} min⁻¹ and a particle "
+                        "radius of {r} cm, the effective diffusion coefficient is "
+                        "D_i = B·r²/π² = {Di} cm²/min.",
+                            slope=fmt(lr.slope), r=r, Di=fmt(Di)))
         return _ok({"weber_morris": segments, "boyd": _clean(boyd)})
     except Exception as exc:
         return _err(exc, traceback.format_exc())
@@ -459,13 +479,13 @@ def _segment_weber_morris(sq, q, n_seg):
         best = [(0, n, lr)]
 
     labels = {
-        1: ["external surface adsorption (instantaneous stage)"],
-        2: ["stage 1: external surface adsorption / film diffusion",
-            "stage 2: intraparticle diffusion (rate-limiting)"],
-        3: ["stage 1: external surface adsorption / film diffusion",
-            "stage 2: intraparticle diffusion (rate-limiting)",
-            "stage 3: equilibrium plateau, diffusion slows as sites fill"],
-    }.get(len(best), [f"stage {i + 1}" for i in range(len(best))])
+        1: [tr("external surface adsorption (instantaneous stage)")],
+        2: [tr("stage 1: external surface adsorption / film diffusion"),
+            tr("stage 2: intraparticle diffusion (rate-limiting)")],
+        3: [tr("stage 1: external surface adsorption / film diffusion"),
+            tr("stage 2: intraparticle diffusion (rate-limiting)"),
+            tr("stage 3: equilibrium plateau, diffusion slows as sites fill")],
+    }.get(len(best), [tr("stage {i}", i=i + 1) for i in range(len(best))])
 
     out = []
     for i, (i0, i1, lr) in enumerate(best):
@@ -481,10 +501,11 @@ def _segment_weber_morris(sq, q, n_seg):
     if len(out) >= 2:
         slower = out[0]["kid"] > out[1]["kid"]
         out_note = (
-            f"The plot resolves into {len(out)} linear regions, which is the "
-            f"expected multi-step behaviour. Region 1 has k_id = "
-            f"{fmt(out[0]['kid'])} and region 2 has k_id = {fmt(out[1]['kid'])} "
-            f"mg g⁻¹ min⁻⁰·⁵. "
+            tr("The plot resolves into {v3} linear regions, which is the "
+            "expected multi-step behaviour. Region 1 has k_id = "
+            "{v2} and region 2 has k_id = {v1} "
+            "mg g⁻¹ min⁻⁰·⁵. ",
+                v3=len(out), v2=fmt(out[0]['kid']), v1=fmt(out[1]['kid']))
             + ("The first stage is faster, as expected: adsorbate first covers the "
                "readily accessible external surface, then diffusion into the pores "
                "takes over and slows the process."
@@ -527,7 +548,8 @@ def fit_thermo(payload_json: str) -> str:
             try:
                 conv = th.dimensionless_K(route, vals)
             except Exception as exc:
-                return _err(f"K° conversion failed at T = {T[i]} K: {exc}")
+                return _err(tr("K° conversion failed at T = {v1} K: {exc}",
+                    v1=T[i], exc=exc))
             K0.append(conv["K0"])
             details.append(conv["detail"])
             warns.extend(conv["warnings"])
@@ -586,7 +608,7 @@ def isotherm_K_for_thermo(payload_json: str) -> str:
                 "R2": _clean(r.stats.get("R2")),
                 "AICc": _clean(r.stats.get("AICc")),
             })
-        return _ok({"model": model_key, "model_name": spec.name, "rows": rows})
+        return _ok({"model": model_key, "model_name": tr(spec.name), "rows": rows})
     except Exception as exc:
         return _err(exc, traceback.format_exc())
 

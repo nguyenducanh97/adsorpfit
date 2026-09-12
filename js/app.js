@@ -268,7 +268,12 @@
       }
 
       bootMsg(3);
-      const files = ["core.py", "isotherms.py", "kinetics.py", "thermo.py",
+      // lang.py and the ko_* tables have to be on the filesystem before
+      // bridge is imported, because core imports lang at module load.
+      const files = ["lang.py", "ko_core.py", "ko_advisor.py",
+                     "ko_kinetics.py", "ko_isotherms.py", "ko_thermo.py",
+                     "ko_extra.py", "ko_names.py", "ko_assumptions.py", "ko.py",
+                     "core.py", "isotherms.py", "kinetics.py", "thermo.py",
                      "advisor.py", "bridge.py"];
       const sources = await Promise.all(files.map(function (f) {
         return fetch("py/" + f + "?v=" + Date.now()).then(function (r) {
@@ -279,6 +284,9 @@
       files.forEach(function (f, i) { py.FS.writeFile("/home/pyodide/" + f, sources[i]); });
       py.runPython("import sys; sys.path.insert(0, '/home/pyodide')");
       bridge = py.pyimport("bridge");
+      // The interpretation paragraphs are written in Python with the fitted
+      // numbers inside them, so the Python side needs the language too.
+      call("set_language", I18N.get());
 
       CATALOGUE.isotherm = call("list_models", "isotherm").models;
       CATALOGUE.kinetics = call("list_models", "kinetics").models;
@@ -365,7 +373,7 @@
       equationNode(m),
       el("p", { class: "tiny", style: "margin-top:-6px",
                 text: m.citation }),
-      el("div", { class: "section-title", text: "Parameters" }),
+      el("div", { class: "section-title", text: I18N.t("sub.params") }),
       el("dl", { class: "kv" }, m.params.reduce(function (acc, p) {
         const dt = el("dt", {}, [symbolNode(p)]);
         if (p.unit && p.unit !== "–" && p.unit !== "-") {
@@ -376,11 +384,11 @@
         acc.push(el("dd", { text: p.meaning }));
         return acc;
       }, [])),
-      el("div", { class: "section-title", text: "What the model assumes" }),
+      el("div", { class: "section-title", text: I18N.t("sec.assumes") }),
       el("ul", { class: "interp" }, m.assumptions.map(function (a) {
         return el("li", { html: md(a) });
       })),
-      m.linear_forms.length ? el("div", { class: "section-title", text: "Linearised forms" }) : null,
+      m.linear_forms.length ? el("div", { class: "section-title", text: I18N.t("sec.linear") }) : null,
       m.linear_forms.length ? el("ul", { class: "interp" }, m.linear_forms.map(function (lf) {
         return el("li", { html: "<strong>" + lf.name + "</strong>: " +
           md(lf.y_label + " vs " + lf.x_label) + (lf.note ? ". " + md(lf.note) : "") });
@@ -961,15 +969,16 @@
     const crit = res.ranking.length ? res.ranking[0].criterion : "AICc";
     const tbl = el("table", { class: "data" }, [
       el("thead", {}, [el("tr", {}, [
-        el("th", { text: "#" }), el("th", { text: "Model" }),
+        el("th", { text: I18N.t("th.rank") }),
+        el("th", { text: I18N.t("th.model") }),
         el("th", { class: "num", text: "p" }),
         el("th", { class: "num", text: crit }),
         el("th", { class: "num", text: "Δ" }),
-        el("th", { class: "num", text: "weight" }),
+        el("th", { class: "num", text: I18N.t("th.weight") }),
         el("th", { class: "num", text: "R²" }),
-        el("th", { class: "num", text: "adj R²" }),
+        el("th", { class: "num", text: I18N.t("th.adjR2") }),
         el("th", { class: "num", text: "RMSE" }),
-        el("th", { text: "support" })
+        el("th", { text: I18N.t("th.support") })
       ])]),
       el("tbody", {}, res.ranking.map(function (r) {
         const m = res.results.find(function (q) { return q.model_key === r.model_key; });
@@ -998,11 +1007,8 @@
     ]);
     wrap.appendChild(el("div", { class: "table-wrap" }, [tbl]));
 
-    wrap.appendChild(el("p", { class: "tiny", style: "margin-top:10px" , html:
-      "<strong>Δ</strong> is the difference in " + crit + " from the best model. " +
-      "<strong>weight</strong> is the Akaike weight, the probability that this model " +
-      "is the best approximating one <em>among those you fitted</em>. Models within " +
-      "Δ &lt; 2 of the leader are not statistically distinguishable from it." }));
+    wrap.appendChild(el("p", { class: "tiny", style: "margin-top:10px",
+      html: I18N.t("th.footnote", { crit: crit }) }));
 
     // Domain and validity findings come first: a model that predicts
     // impossible values is a harder problem than a wide confidence interval,
@@ -1075,7 +1081,7 @@
         modeSel
       ]),
       el("div", { id: cat + "-plot" }),
-      el("div", { class: "section-title", text: "Series appearance" }),
+      el("div", { class: "section-title", text: I18N.t("fig.series") }),
       traceHost
     ]);
 
@@ -1501,10 +1507,11 @@
       body.appendChild(el("div", { class: "table-wrap" }, [
         el("table", { class: "data" }, [
           el("thead", {}, [el("tr", {}, [
-            el("th", { text: "Parameter" }), el("th", { text: "Unit" }),
-            el("th", { class: "num", text: "Value" }),
-            el("th", { class: "num", text: "Std. error" }),
-            el("th", { class: "num", text: "95% CI" }),
+            el("th", { text: I18N.t("th.parameter") }),
+            el("th", { text: I18N.t("th.unit") }),
+            el("th", { class: "num", text: I18N.t("th.value") }),
+            el("th", { class: "num", text: I18N.t("th.stderr") }),
+            el("th", { class: "num", text: I18N.t("th.ci") }),
             el("th", { class: "num", text: "t" }),
             el("th", { class: "num", text: "p" })
           ])]),
@@ -1527,7 +1534,7 @@
       ]));
 
       if (Object.keys(m.derived || {}).length) {
-        body.appendChild(el("div", { class: "section-title", text: "Derived quantities" }));
+        body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.derived") }));
         const dl = el("dl", { class: "kv" });
         Object.keys(m.derived).forEach(function (k) {
           const v = m.derived[k];
@@ -1541,7 +1548,7 @@
         body.appendChild(dl);
       }
 
-      body.appendChild(el("div", { class: "section-title", text: "Goodness of fit" }));
+      body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.gof") }));
       const S = m.stats;
       const statRows = [
         ["R²", S.R2], ["adjusted R²", S.adj_R2], ["RMSE", S.RMSE],
@@ -1603,13 +1610,11 @@
       card.appendChild(el("div", { class: "rb" },
         blockers.map(function (i) { return issueNode(i, null); }).concat([
         blockers.length ? el("p", { class: "tiny", style: "margin:0 0 12px",
-          text: "The interpretation below is generated from parameters that fall "
-              + "outside this model's valid range. It is shown for completeness "
-              + "only; do not quote it." }): null,
+          text: I18N.t("interp.outOfRange") }) : null,
         el("ul", { class: "interp" }, m.interpretation.map(function (s) {
           return el("li", { html: md(s) });
         })),
-        el("div", { class: "section-title", text: "Model assumptions you are accepting" }),
+        el("div", { class: "section-title", text: I18N.t("sec.assuming") }),
         el("ul", { class: "interp" }, m.assumptions.map(function (a) {
           return el("li", { html: md(a) });
         }))
@@ -1631,7 +1636,7 @@
     }
 
     wrap.appendChild(el("div", { class: "section-title",
-      text: "Weber–Morris multi-region analysis" }));
+      text: I18N.t("sec.weberMorris") }));
     wrap.appendChild(el("div", { class: "callout info" }, [
       el("span", { class: "ci", text: "▸" }),
       el("span", { html: md(d.weber_morris.note) })
@@ -1660,7 +1665,7 @@
     wrap.appendChild(el("div", { id: "wm-plot", style: "margin-top:14px" }));
 
     if (d.boyd && d.boyd.t) {
-      wrap.appendChild(el("div", { class: "section-title", text: "Boyd plot" }));
+      wrap.appendChild(el("div", { class: "section-title", text: I18N.t("sec.boyd") }));
       wrap.appendChild(el("div", { class: "callout " +
         (d.boyd.through_origin ? "good" : "warn") }, [
         el("span", { class: "ci", text: d.boyd.through_origin ? "✓" : "⚠" }),
@@ -1719,13 +1724,7 @@
 
     wrap.appendChild(el("div", { class: "callout warn" }, [
       el("span", { class: "ci", text: "⚠" }),
-      el("span", { html: md(
-        "Linearised fits are shown for comparison with the older literature, not " +
-        "because they are better. Transforming the data changes which points " +
-        "dominate the regression, so the parameters below generally differ from " +
-        "the non-linear ones: and the R² of a linear plot is not comparable with " +
-        "the R² of a non-linear fit. Where the two disagree, report the non-linear " +
-        "result.") })
+      el("span", { html: md(I18N.t("lin.caveat")) })
     ]));
 
     res.results.forEach(function (m) {
@@ -1817,34 +1816,34 @@
   /* ------------------------------------------------------------- export */
 
   const IMAGE_FORMATS = [
-    ["png", "PNG: raster, lossless, universal"],
-    ["tiff", "TIFF: LZW compressed, the Elsevier/Wiley standard for line art"],
-    ["pdf", "PDF: vector, editable, best for LaTeX"],
-    ["svg", "SVG: vector, editable in Illustrator or Inkscape"],
-    ["eps", "EPS: vector PostScript, required by some older journals"],
-    ["ps", "PS: PostScript"],
-    ["jpg", "JPEG: lossy; only for photographs, not line art"],
-    ["webp", "WebP: modern raster, good for web supplements"],
-    ["bmp", "BMP: uncompressed raster"]
+    ["png", "fmt.png"],
+    ["tiff", "fmt.tiff"],
+    ["pdf", "fmt.pdf"],
+    ["svg", "fmt.svg"],
+    ["eps", "fmt.eps"],
+    ["ps", "fmt.ps"],
+    ["jpg", "fmt.jpg"],
+    ["webp", "fmt.webp"],
+    ["bmp", "fmt.bmp"]
   ];
 
   const TABLE_FORMATS = [
-    ["csv", "CSV: comma separated"],
-    ["tsv", "TSV: tab separated, pastes straight into Excel"],
-    ["xlsx", "XLSX: formatted Excel workbook, one sheet per table"],
-    ["markdown", "Markdown: for GitHub or notebooks"],
-    ["latex", "LaTeX: a complete table environment"],
-    ["html", "HTML: for Word via paste"],
-    ["json", "JSON: the full result object"]
+    ["csv", "fmt.csv"],
+    ["tsv", "fmt.tsv"],
+    ["xlsx", "fmt.xlsx"],
+    ["markdown", "fmt.markdown"],
+    ["latex", "fmt.latex"],
+    ["html", "fmt.html"],
+    ["json", "fmt.json"]
   ];
 
   function renderExport(cat) {
     const wrap = el("div");
 
-    wrap.appendChild(el("div", { class: "section-title", text: "Figure" }));
+    wrap.appendChild(el("div", { class: "section-title", text: I18N.t("sec.figure") }));
     const fmtSel = el("select", { id: cat + "-imgfmt" },
       IMAGE_FORMATS.map(function (f) {
-        return el("option", { value: f[0], text: f[1] });
+        return el("option", { value: f[0], text: I18N.t(f[1]) });
       }));
     const dpiSel = el("select", { id: cat + "-imgdpi" },
       [150, 300, 600, 900, 1200].map(function (d) {
@@ -1859,10 +1858,7 @@
         el("span", { class: "lbl", text: "Resolution" }), dpiSel])
     ]));
     wrap.appendChild(el("p", { class: "tiny", html:
-      "The export is rendered by Matplotlib using exactly the style settings on " +
-      "the Figures tab: it is not a screenshot of the preview. Vector formats " +
-      "(PDF, SVG, EPS, PS) ignore the resolution setting because they have no " +
-      "pixels; set it for the raster formats." }));
+      I18N.t("exp.figureNote") }));
     wrap.appendChild(el("div", { class: "btn-row", style: "margin:10px 0 22px" }, [
       el("button", { class: "btn primary", onclick: function () {
         exportFigure(cat, fmtSel.value, Number(dpiSel.value));
@@ -1872,12 +1868,12 @@
       } }, ["Download every format"])
     ]));
 
-    wrap.appendChild(el("div", { class: "section-title", text: "Results tables" }));
+    wrap.appendChild(el("div", { class: "section-title", text: I18N.t("sec.tables") }));
     const tfmt = el("select", { id: cat + "-tabfmt" },
       TABLE_FORMATS
         .filter(function (f) { return f[0] !== "xlsx" || XLSX_AVAILABLE; })
         .map(function (f) {
-          return el("option", { value: f[0], text: f[1] });
+          return el("option", { value: f[0], text: I18N.t(f[1]) });
         }));
     wrap.appendChild(el("label", { class: "field" }, [
       el("span", { class: "lbl", text: "Format" }), tfmt]));
@@ -1890,11 +1886,9 @@
       } }, ["Copy to clipboard"])
     ]));
 
-    wrap.appendChild(el("div", { class: "section-title", text: "Plot data" }));
+    wrap.appendChild(el("div", { class: "section-title", text: I18N.t("sec.plotData") }));
     wrap.appendChild(el("p", { class: "tiny", html:
-      "Exports the experimental points and every fitted curve as x,y columns, so " +
-      "you can rebuild the figure in Origin, GraphPad or Excel if a coauthor " +
-      "insists on it." }));
+      I18N.t("exp.curveNote") }));
     wrap.appendChild(el("div", { class: "btn-row", style: "margin-top:10px" }, [
       el("button", { class: "btn", onclick: function () { exportCurves(cat); } },
         ["Download curve data (CSV)"]),
@@ -2410,7 +2404,7 @@
         color: Fig.PALETTE[0], symbol: "circle", marker_size: 6 },
       { kind: "line", x: [x0, x1],
         y: [vh.slope * x0 + vh.intercept, vh.slope * x1 + vh.intercept],
-        name: "van't Hoff fit (R² = " + fmt(vh.R2, 4) + ")",
+        name: I18N.t("th.vhFit", { r2: fmt(vh.R2, 4) }),
         color: Fig.PALETTE[1], dash: "dash", line_width: 1.6 }
     ],
     style: (prev.vanthoff && prev.vanthoff.style) || Fig.newStyle({
@@ -2443,7 +2437,7 @@
     });
     if (rows.length) {
       figs.isosteric = {
-        label: "Isosteric heat: ΔHᵢₛₒ vs loading",
+        label: I18N.t("th.isoLabel"),
         traces: [{
           kind: "scatter", x: rows.map(function (r) { return r.q; }),
           y: rows.map(function (r) { return r.dH_iso_kJ_mol; }),
@@ -2502,7 +2496,7 @@
 
     const panel = el("div", { class: "panel" }, [
       el("div", { class: "panel-head" }, [
-        el("h2", { text: "Thermodynamic parameters" }),
+        el("h2", { text: I18N.t("th.params") }),
         el("span", { class: "hint" }, [
           el("span", { class: "chip " + (res.route_defensible ? "info" : "bad"),
                        html: md(res.route_label) })
@@ -2518,7 +2512,7 @@
       bigStat("ΔS°", fmt(vh.dS_J_mol_K, 4) + " J mol⁻¹ K⁻¹",
               "± " + fmt(vh.dS_se_J_mol_K, 2)),
       bigStat("van't Hoff R²", fmt(vh.R2, 5),
-              vh.R2 > 0.98 ? "good linearity" : "check for curvature")
+              vh.R2 > 0.98 ? I18N.t("th.goodLin") : I18N.t("th.checkCurve"))
     ]));
 
     // per-temperature table
@@ -2543,10 +2537,10 @@
       ])
     ]));
 
-    body.appendChild(el("div", { class: "section-title", text: "van't Hoff plot" }));
+    body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.vantHoff") }));
     body.appendChild(el("div", { id: "vh-plot" }));
 
-    body.appendChild(el("div", { class: "section-title", text: "Interpretation" }));
+    body.appendChild(el("div", { class: "section-title", text: I18N.t("sub.interp") }));
     body.appendChild(el("ul", { class: "interp" }, res.interpretation.map(function (s) {
       return el("li", { html: md(s) });
     })));
@@ -2559,7 +2553,7 @@
 
     // per-temperature isotherm constants
     body.appendChild(el("div", { class: "section-title",
-      text: "Isotherm constants used (" + res._kfit.model_name + ")" }));
+      text: I18N.t("th.constUsed", { model: res._kfit.model_name }) }));
     const pkeys = Object.keys(res._kfit.rows[0].params);
     body.appendChild(el("div", { class: "table-wrap" }, [
       el("table", { class: "data" }, [
@@ -2578,7 +2572,7 @@
 
     if (res.isosteric) {
       body.appendChild(el("div", { class: "section-title",
-        text: "Isosteric heat of adsorption" }));
+        text: I18N.t("th.isosteric") }));
       body.appendChild(el("p", { class: "tiny", html: md(res.isosteric.note) }));
       body.appendChild(el("div", { class: "table-wrap" }, [
         el("table", { class: "data" }, [
@@ -2624,10 +2618,10 @@
     }
 
     body.appendChild(el("div", { class: "section-title",
-                                 text: "Figure styling and export" }));
+                                 text: I18N.t("th.figStyle") }));
     body.appendChild(buildThermoFigurePanel());
 
-    body.appendChild(el("div", { class: "section-title", text: "Data export" }));
+    body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.dataExport") }));
     body.appendChild(el("div", { class: "btn-row" }, [
       el("button", { class: "btn", onclick: function () {
         const rows = vh.T.map(function (T, i) {
@@ -2725,7 +2719,7 @@
 
     const fmtSel = el("select", { id: "th-imgfmt" },
       IMAGE_FORMATS.map(function (f) {
-        return el("option", { value: f[0], text: f[1] });
+        return el("option", { value: f[0], text: I18N.t(f[1]) });
       }));
     const dpiSel = el("select", { id: "th-imgdpi" },
       [150, 300, 600, 900, 1200].map(function (d) {
@@ -2882,7 +2876,7 @@
       ]));
 
       const u = Projects.usage();
-      body.appendChild(el("div", { class: "section-title", text: "Storage" }));
+      body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.storage") }));
       body.appendChild(el("p", { class: "tiny", html:
         u.count + " project(s) saved, using " + (u.bytes / 1024).toFixed(1)
         + " KB of this browser's local storage. Preferences and projects live "
@@ -3214,7 +3208,7 @@
         body.appendChild(row);
       });
 
-      body.appendChild(el("div", { class: "section-title", text: "Transfer" }));
+      body.appendChild(el("div", { class: "section-title", text: I18N.t("sec.transfer") }));
       body.appendChild(el("p", { class: "tiny", html:
         "Projects are stored in this browser only. Export to a file to move one "
         + "to another computer, or to keep a backup." }));
@@ -3330,7 +3324,44 @@
         b.setAttribute("aria-pressed",
           b.textContent.toLowerCase() === lang ? "true" : "false");
       });
-      // re-render anything whose text was generated rather than marked up
+
+      // The interpretation paragraphs, the domain warnings and the advisor's
+      // reasons are composed in Python with the fitted numbers already inside
+      // them, so re-rendering cannot translate them: they have to be written
+      // again. The analyses are re-run silently, which costs well under a
+      // second and leaves every setting and every result in place.
+      if (bridge) {
+        try { call("set_language", lang); } catch (e) { /* not booted yet */ }
+
+        // The catalogue carries the model names, which are translated too,
+        // so it is fetched again and the pickers rebuilt. Rebuilding clears
+        // the checkboxes, so the current selection is carried across.
+        try {
+          const chosen = {};
+          ["kinetics", "isotherm"].forEach(function (c) {
+            const pref = c === "kinetics" ? "kin" : "iso";
+            chosen[c] = $$("#" + pref + "-models input:checked")
+              .map(function (b) { return b.value; });
+          });
+          CATALOGUE.isotherm = call("list_models", "isotherm").models;
+          CATALOGUE.kinetics = call("list_models", "kinetics").models;
+          ["kinetics", "isotherm"].forEach(function (c) {
+            buildModelPicker(c);
+            const pref = c === "kinetics" ? "kin" : "iso";
+            $$("#" + pref + "-models input").forEach(function (b) {
+              b.checked = chosen[c].indexOf(b.value) >= 0;
+            });
+          });
+        } catch (e) { console.warn("catalogue refresh failed", e); }
+
+        ["kinetics", "isotherm"].forEach(function (c) {
+          if (STATE[c].fit) runFit(c, { silent: true });
+          if (STATE[c].advice) runAdvisor(c, { silent: true });
+        });
+        if (STATE.thermo.result) runThermo({ silent: true });
+      }
+
+      // everything else is marked up, so a re-render is enough
       ["kinetics", "isotherm"].forEach(function (c) {
         if (STATE[c].fit) renderResults(c);
         renderAdvice(c);

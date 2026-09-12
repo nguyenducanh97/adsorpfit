@@ -40,6 +40,8 @@ import numpy as np
 from scipy.optimize import least_squares, curve_fit
 from scipy import stats as sps
 
+from lang import tr
+
 R_GAS = 8.314462618          # J / (mol K)
 WATER_MOLARITY = 55.5        # mol / L, pure water at ~298 K
 
@@ -335,9 +337,9 @@ def fit_model(spec: ModelSpec,
     x, y = x[mask], y[mask]
 
     if x.size < spec.n_params:
-        return _failed(spec, x, y,
-                       f"Need at least {spec.n_params} points to fit "
-                       f"{spec.n_params} parameters; got {x.size}.")
+        return _failed(spec, x, y, tr(
+            "Need at least {p} points to fit {p} parameters, but got {n}.",
+            p=spec.n_params, n=x.size))
 
     if weights == "relative":
         w = 1.0 / np.where(np.abs(y) > 1e-12, np.abs(y), 1e-12)
@@ -386,8 +388,8 @@ def fit_model(spec: ModelSpec,
             continue
 
     if best is None:
-        return _failed(spec, x, y, "Optimiser failed from every start. "
-                                   + ("; ".join(msgs[:2])))
+        return _failed(spec, x, y, tr("Optimiser failed from every start.")
+                       + " " + ("; ".join(msgs[:2])))
 
     theta = best.x
     y_cal = np.asarray(model_fn(x, theta), float)
@@ -410,17 +412,20 @@ def fit_model(spec: ModelSpec,
     for p in spec.params:
         v = params[p.key]
         if np.isfinite(se[p.key]) and se[p.key] > abs(v):
-            warns.append(
-                f"{p.symbol} is not resolved by these data: its standard error "
-                f"({se[p.key]:.3g}) exceeds the estimate itself ({v:.3g}). "
-                f"Treat this parameter as indeterminate."
-            )
+            warns.append(tr(
+                "{sym} is not resolved by these data: its standard error "
+                "({se:.3g}) exceeds the estimate itself ({v:.3g}). Treat this "
+                "parameter as indeterminate.",
+                sym=p.symbol, se=se[p.key], v=v))
         if np.isfinite(p.upper) and abs(v - p.upper) < 1e-6 * max(1.0, abs(p.upper)):
-            warns.append(f"{p.symbol} hit its upper bound ({p.upper:g}) - "
-                         f"the optimum lies outside the physically allowed range.")
+            warns.append(tr(
+                "{sym} hit its upper bound ({bound:g}), so the optimum lies "
+                "outside the physically allowed range.",
+                sym=p.symbol, bound=p.upper))
         if abs(v - p.lower) < 1e-9 and p.lower == 0.0:
-            warns.append(f"{p.symbol} collapsed to zero, which usually means "
-                         f"this model term is not supported by the data.")
+            warns.append(tr(
+                "{sym} collapsed to zero, which usually means this model term "
+                "is not supported by the data.", sym=p.symbol))
 
     issues = list(check_domain(spec, x, y, ctx))
     specific = []
@@ -441,7 +446,7 @@ def fit_model(spec: ModelSpec,
         issues.append(i)
 
     res = FitResult(
-        model_key=spec.key, model_name=spec.name, method="nonlinear",
+        model_key=spec.key, model_name=tr(spec.name), method="nonlinear",
         success=True, params=params, stderr=se, ci95=ci,
         tvalue=tval, pvalue=pval, stats=st,
         x=x, y=y, y_cal=y_cal, residuals=y - y_cal,
@@ -472,29 +477,30 @@ def fit_linear(spec: ModelSpec, form: LinearForm,
     ys = np.asarray(ys, float)
     ok = np.isfinite(xs) & np.isfinite(ys)
     if ok.sum() < 2:
-        return _failed(spec, x, y, "Linearisation produced fewer than two "
-                                   "valid points (log or reciprocal of a "
-                                   "non-positive value).")
+        return _failed(spec, x, y, tr(
+            "Linearisation produced fewer than two valid points (the log or "
+            "reciprocal of a non-positive value)."))
 
     # A transform can collapse the x axis to a single value (the Scatchard
     # form of Langmuir does exactly that on flat data), and SciPy raises
     # rather than returning a degenerate line. Catch it here: one unusable
     # linearisation must not take down the whole request.
     if np.ptp(xs[ok]) == 0:
-        return _failed(spec, x, y,
-                       f"The {form.name} transform maps every point to the same "
-                       f"x value, so no line can be fitted through them. This "
-                       f"happens when the data are flat; the non-linear fit is "
-                       f"unaffected.")
+        return _failed(spec, x, y, tr(
+            "The {form} transform maps every point to the same x value, so no "
+            "line can be fitted through them. This happens when the data are "
+            "flat. The non-linear fit is unaffected.", form=form.name))
     try:
         lr = sps.linregress(xs[ok], ys[ok])
     except Exception as exc:
-        return _failed(spec, x, y,
-                       f"The {form.name} linearisation could not be fitted: {exc}")
+        return _failed(spec, x, y, tr(
+            "The {form} linearisation could not be fitted: {exc}",
+            form=form.name, exc=exc))
     try:
         params = form.recover(lr.slope, lr.intercept, ctx)
     except Exception as exc:
-        return _failed(spec, x, y, f"Could not recover parameters: {exc}")
+        return _failed(spec, x, y, tr(
+            "Could not recover parameters: {exc}", exc=exc))
 
     theta = [params.get(p.key, np.nan) for p in spec.params]
     try:
@@ -512,21 +518,21 @@ def fit_linear(spec: ModelSpec, form: LinearForm,
 
     warns = []
     if ok.sum() < xs.size:
-        warns.append(
-            f"{xs.size - ok.sum()} of {xs.size} points were discarded by the "
-            f"{form.name} linearisation (the transform is undefined for them). "
-            f"The non-linear fit uses all points."
-        )
+        warns.append(tr(
+            "{dropped} of {n} points were discarded by the {form} "
+            "linearisation, because the transform is undefined for them. The "
+            "non-linear fit uses all points.",
+            dropped=xs.size - ok.sum(), n=xs.size, form=form.name))
     if np.isfinite(st["R2"]) and np.isfinite(st["R2_linear"]) \
             and st["R2_linear"] - st["R2"] > 0.05:
-        warns.append(
-            f"The linear plot reports R^2 = {st['R2_linear']:.4f}, but the "
-            f"same parameters reproduce the raw q data with only R^2 = "
-            f"{st['R2']:.4f}. The linearisation is flattering the fit."
-        )
+        warns.append(tr(
+            "The linear plot reports R^2 = {r2lin:.4f}, but the same "
+            "parameters reproduce the raw q data with only R^2 = {r2:.4f}. "
+            "The linearisation is flattering the fit.",
+            r2lin=st["R2_linear"], r2=st["R2"]))
 
     res = FitResult(
-        model_key=spec.key, model_name=spec.name,
+        model_key=spec.key, model_name=tr(spec.name),
         method=f"linear:{form.name}", success=True,
         params={p.key: float(v) for p, v in zip(spec.params, theta)},
         stderr={p.key: np.nan for p in spec.params},
@@ -586,7 +592,7 @@ def rank_models(results: Sequence[FitResult], criterion: str = "AICc") -> list[d
             "adj_R2": r.stats["adj_R2"],
             "RMSE": r.stats["RMSE"],
             "n_params": r.stats["n_params"],
-            "evidence": ("best model in this set" if rank == 1
+            "evidence": (tr("best model in this set") if rank == 1
                          else _evidence_phrase(float(delta[i]))),
         })
     return out
@@ -595,14 +601,14 @@ def rank_models(results: Sequence[FitResult], criterion: str = "AICc") -> list[d
 def _evidence_phrase(delta: float) -> str:
     """Burnham & Anderson's rule of thumb for Delta-AIC."""
     if delta < 2:
-        return "substantial support - indistinguishable from the best model"
+        return tr("substantial support, indistinguishable from the best model")
     if delta < 4:
-        return "strong support"
+        return tr("strong support")
     if delta < 7:
-        return "considerably less support"
+        return tr("considerably less support")
     if delta < 10:
-        return "weak support"
-    return "essentially no support"
+        return tr("weak support")
+    return tr("essentially no support")
 
 
 # --------------------------------------------------------------------------
@@ -657,31 +663,31 @@ def check_domain(spec: ModelSpec, x, y, ctx: dict | None = None) -> list[dict]:
     n = x.size
     p = spec.n_params
     if n < p:
-        out.append(issue("block", "too_few_points",
-                         f"{n} data points cannot determine {p} parameters."))
+        out.append(issue("block", "too_few_points", tr(
+            "{n} data points cannot determine {p} parameters.", n=n, p=p)))
     elif n < p + 2:
-        out.append(issue("warn", "few_points",
-                         f"Only {n} points for {p} parameters leaves {n - p} "
-                         f"degrees of freedom. The fit will look excellent "
-                         f"because it is nearly interpolating, and the "
-                         f"confidence intervals will be very wide."))
+        out.append(issue("warn", "few_points", tr(
+            "Only {n} points for {p} parameters leaves {df} degrees of "
+            "freedom. The fit will look excellent because it is nearly "
+            "interpolating, and the confidence intervals will be very wide.",
+            n=n, p=p, df=n - p)))
 
     if np.any(y < 0):
-        out.append(issue("warn", "negative_y",
-                         f"{int(np.sum(y < 0))} of your q values are negative. "
-                         f"A negative uptake usually means the measured "
-                         f"equilibrium concentration exceeded the initial one - "
-                         f"check for desorption, evaporation or a calibration "
-                         f"offset before modelling."))
+        out.append(issue("warn", "negative_y", tr(
+            "{k} of your q values are negative. A negative uptake usually "
+            "means the measured equilibrium concentration exceeded the "
+            "initial one, so check for desorption, evaporation or a "
+            "calibration offset before modelling.",
+            k=int(np.sum(y < 0)))))
     if np.any(x < 0):
-        out.append(issue("block", "negative_x",
-                         "Negative concentrations or times cannot be modelled."))
+        out.append(issue("block", "negative_x", tr(
+            "Negative concentrations or times cannot be modelled.")))
 
     if len(np.unique(x)) < len(x):
-        out.append(issue("info", "duplicate_x",
-                         "Some x values are repeated. That is fine for replicate "
-                         "measurements, but each replicate is weighted as an "
-                         "independent point."))
+        out.append(issue("info", "duplicate_x", tr(
+            "Some x values are repeated. That is fine for replicate "
+            "measurements, but each replicate is weighted as an "
+            "independent point.")))
 
     if spec.domain is not None:
         try:
@@ -710,26 +716,33 @@ def _physical_prediction_check(spec, params, x, y, y_cal, ctx) -> list[dict]:
         if rng is not None:
             lo, hi = rng
             if lo is not None and np.isfinite(lo):
-                extra = (f" With these parameters the model is only defined for "
-                         f"x > {fmt(lo)}; ")
+                extra = " " + tr(
+                    "With these parameters the model is only defined for "
+                    "x > {lo}.", lo=fmt(lo))
                 below = int(np.sum(np.asarray(x) < lo))
                 if below:
-                    extra += f"{below} of your {len(x)} points lie below that."
+                    extra += " " + tr(
+                        "{below} of your {n} points lie below that.",
+                        below=below, n=len(x))
             elif hi is not None and np.isfinite(hi):
-                extra = (f" With these parameters the model is only defined for "
-                         f"x < {fmt(hi)}.")
+                extra = " " + tr(
+                    "With these parameters the model is only defined for "
+                    "x < {hi}.", hi=fmt(hi))
         out.append(issue(
             "block", "negative_prediction",
-            f"This model predicts a NEGATIVE q of {fmt(worst)} at x = {fmt(where)}, "
-            f"which is physically impossible ({neg} of {len(x)} fitted points are "
-            f"affected).{extra} The fit statistics are therefore meaningless no "
-            f"matter how good R² looks - do not report these parameters."))
+            tr("This model predicts a NEGATIVE q of {worst} at x = {where}, "
+               "which is physically impossible ({neg} of {n} fitted points "
+               "are affected).", worst=fmt(worst), where=fmt(where),
+               neg=neg, n=len(x))
+            + extra + " " +
+            tr("The fit statistics are therefore meaningless no matter how "
+               "good R² looks, so do not report these parameters.")))
 
     nonfinite = int(np.sum(~np.isfinite(y_cal)))
     if nonfinite:
-        out.append(issue("block", "nonfinite_prediction",
-                         f"The model is undefined at {nonfinite} of your data "
-                         f"points, so those points contributed nothing to the fit."))
+        out.append(issue("block", "nonfinite_prediction", tr(
+            "The model is undefined at {k} of your data points, so those "
+            "points contributed nothing to the fit.", k=nonfinite)))
     return out
 
 
@@ -760,7 +773,7 @@ def _stderr_from_jac(jac, fun, n, p) -> np.ndarray:
 def _failed(spec: ModelSpec, x, y, msg: str) -> FitResult:
     nan = {p.key: np.nan for p in spec.params}
     return FitResult(
-        model_key=spec.key, model_name=spec.name, method="nonlinear",
+        model_key=spec.key, model_name=tr(spec.name), method="nonlinear",
         success=False, params=dict(nan), stderr=dict(nan),
         ci95={k: (np.nan, np.nan) for k in nan},
         tvalue=dict(nan), pvalue=dict(nan),

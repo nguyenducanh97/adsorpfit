@@ -25,6 +25,7 @@ import numpy as np
 
 from core import (ModelSpec, ParamSpec, LinearForm, R_GAS, fmt, issue,
                   terminal_slope_ratio)
+from lang import tr
 
 
 # --------------------------------------------------------------------------
@@ -75,41 +76,45 @@ def _interp_pfo(f, ctx):
     f.derived["t_half"] = t_half
     f.derived["t_95"] = t95
     out = [
-        f"The calculated equilibrium capacity is q_e,cal = {fmt(qe)} mg/g and the "
-        f"pseudo-first-order rate constant is k₁ = {fmt(k1)} min⁻¹.",
-        f"k₁ sets the timescale of uptake: the half-time is t₁/₂ = ln2/k₁ = "
-        f"{fmt(t_half)} min, and 95% of equilibrium is reached at about "
-        f"{fmt(t95)} min. Those numbers, not k₁ itself, are what a column or "
-        f"batch reactor design actually needs.",
-        "Lagergren's model assumes the rate of uptake is proportional to the number "
+        tr("The calculated equilibrium capacity is q_e,cal = {qe} mg/g and the "
+        "pseudo-first-order rate constant is k₁ = {k1} min⁻¹.",
+            qe=fmt(qe), k1=fmt(k1)),
+        tr("k₁ sets the timescale of uptake: the half-time is t₁/₂ = ln2/k₁ = "
+        "{t_half} min, and 95% of equilibrium is reached at about "
+        "{t95} min. Those numbers, not k₁ itself, are what a column or "
+        "batch reactor design actually needs.",
+            t_half=fmt(t_half), t95=fmt(t95)),
+        tr("Lagergren's model assumes the rate of uptake is proportional to the number "
         "of *unoccupied* sites, (q_e − q_t). Mechanistically that corresponds to "
         "adsorption controlled by physisorption onto a surface where the driving "
         "force is simply the remaining free capacity; it does not imply a "
-        "first-order chemical reaction.",
+        "first-order chemical reaction."),
     ]
     q_obs = float(np.max(f.y))
     if q_obs > 0:
         diff = 100.0 * abs(qe - q_obs) / q_obs
         if diff > 15:
             out.append(
-                f"Consistency warning: the fitted q_e,cal ({fmt(qe)} mg/g) differs from "
-                f"your highest measured loading ({fmt(q_obs)} mg/g) by {diff:.0f}%. "
-                f"A PFO fit whose q_e,cal disagrees badly with q_e,exp is the "
-                f"classic sign that the model is wrong for these data, no matter "
-                f"how good R² looks. Compare q_e,cal against q_e,exp for every "
-                f"kinetic model you report: this check catches more bad fits than "
-                f"R² does."
+                tr("Consistency warning: the fitted q_e,cal ({qe} mg/g) differs from "
+                "your highest measured loading ({q_obs} mg/g) by {diff:.0f}%. "
+                "A PFO fit whose q_e,cal disagrees badly with q_e,exp is the "
+                "classic sign that the model is wrong for these data, no matter "
+                "how good R² looks. Compare q_e,cal against q_e,exp for every "
+                "kinetic model you report: this check catches more bad fits than "
+                "R² does.",
+                    qe=fmt(qe), q_obs=fmt(q_obs), diff=diff)
             )
         else:
             out.append(
-                f"q_e,cal ({fmt(qe)} mg/g) agrees with the observed plateau "
-                f"({fmt(q_obs)} mg/g) to within {diff:.0f}%, which supports the model."
+                tr("q_e,cal ({qe} mg/g) agrees with the observed plateau "
+                "({q_obs} mg/g) to within {diff:.0f}%, which supports the model.",
+                    qe=fmt(qe), q_obs=fmt(q_obs), diff=diff)
             )
     out.append(
-        "PFO is generally the better description of the *early* stage of "
+        tr("PFO is generally the better description of the *early* stage of "
         "adsorption and tends to underpredict the approach to equilibrium. If it "
         "fits your first few points but drifts later, that pattern is expected "
-        "rather than surprising."
+        "rather than surprising.")
     )
     return out
 
@@ -164,39 +169,43 @@ def _interp_pso(f, ctx):
     f.derived["h_initial_rate"] = h
     f.derived["t_half"] = t_half
     out = [
-        f"q_e,cal = {fmt(qe)} mg/g and k₂ = {fmt(k2)} g mg⁻¹ min⁻¹.",
-        f"The initial adsorption rate is h = k₂·q_e² = {fmt(h)} mg g⁻¹ min⁻¹, the "
-        f"slope of uptake at t = 0, and the most directly comparable number between "
-        f"experiments. The half-time is t₁/₂ = 1/(k₂q_e) = {fmt(t_half)} min.",
-        "The pseudo-second-order model assumes the rate depends on the *square* of "
+        tr("q_e,cal = {qe} mg/g and k₂ = {k2} g mg⁻¹ min⁻¹.",
+            qe=fmt(qe), k2=fmt(k2)),
+        tr("The initial adsorption rate is h = k₂·q_e² = {h} mg g⁻¹ min⁻¹, the "
+        "slope of uptake at t = 0, and the most directly comparable number between "
+        "experiments. The half-time is t₁/₂ = 1/(k₂q_e) = {t_half} min.",
+            h=fmt(h), t_half=fmt(t_half)),
+        tr("The pseudo-second-order model assumes the rate depends on the *square* of "
         "the number of free sites, d q_t/dt = k₂(q_e − q_t)². It is conventionally "
         "read as evidence that chemisorption, meaning valency forces through sharing or "
-        "exchange of electrons: controls the rate.",
+        "exchange of electrons: controls the rate."),
     ]
     q_obs = float(np.max(f.y))
     if q_obs > 0:
         diff = 100.0 * abs(qe - q_obs) / q_obs
         out.append(
-            f"q_e,cal vs q_e,exp: {fmt(qe)} vs {fmt(q_obs)} mg/g ({diff:.0f}% apart)."
+            tr("q_e,cal vs q_e,exp: {qe} vs {q_obs} mg/g ({diff:.0f}% apart).",
+                qe=fmt(qe), q_obs=fmt(q_obs), diff=diff)
             + (" Good agreement." if diff <= 10 else
-               " This gap is large enough to question the fit.")
+               tr(" This gap is large enough to question the fit."))
         )
     out.append(
-        "Two cautions that the literature routinely omits. First, PSO fits almost "
+        tr("Two cautions that the literature routinely omits. First, PSO fits almost "
         "every batch dataset well, because its algebraic form happens to match the "
         "shape of a saturating curve, so a high R² for PSO is weak evidence of "
         "chemisorption, not strong evidence. Second, k₂ is not a true constant: it "
         "varies systematically with initial concentration, adsorbent dose and "
         "particle size, so k₂ values are only comparable between experiments run "
-        "under identical conditions."
+        "under identical conditions.")
     )
     c0 = ctx.get("C0")
     if c0:
         out.append(
-            f"Because your data were collected at C₀ = {c0} mg/L, the k₂ reported here "
-            f"belongs to that concentration only. To claim a concentration-independent "
-            f"mechanism you would need k₂ measured across several C₀ values and shown "
-            f"to be constant: which it usually is not."
+            tr("Because your data were collected at C₀ = {c0} mg/L, the k₂ reported here "
+            "belongs to that concentration only. To claim a concentration-independent "
+            "mechanism you would need k₂ measured across several C₀ values and shown "
+            "to be constant: which it usually is not.",
+                c0=c0)
         )
     return out
 
@@ -254,27 +263,30 @@ def _elovich(t, alpha, beta):
 def _interp_elovich(f, ctx):
     a = f.params["alpha"]; b = f.params["beta"]
     out = [
-        f"α = {fmt(a)} mg g⁻¹ min⁻¹ is the initial adsorption rate, the uptake rate "
-        f"when the surface is still bare.",
-        f"β = {fmt(b)} g mg⁻¹ is the desorption constant, related to the extent of "
-        f"surface coverage and the activation energy for chemisorption. 1/β = "
-        f"{fmt(1.0 / b if b else np.nan)} mg/g indicates how much the surface can "
-        f"take up before the rate falls off appreciably.",
-        "The Elovich equation assumes the activation energy for adsorption rises "
+        tr("α = {a} mg g⁻¹ min⁻¹ is the initial adsorption rate, the uptake rate "
+        "when the surface is still bare.",
+            a=fmt(a)),
+        tr("β = {b} g mg⁻¹ is the desorption constant, related to the extent of "
+        "surface coverage and the activation energy for chemisorption. 1/β = "
+        "{v1} mg/g indicates how much the surface can "
+        "take up before the rate falls off appreciably.",
+            b=fmt(b), v1=fmt(1.0 / b if b else np.nan)),
+        tr("The Elovich equation assumes the activation energy for adsorption rises "
         "*linearly* with coverage. That is the behaviour of a genuinely "
         "heterogeneous surface undergoing chemisorption: the strongest sites are "
-        "consumed first, so each additional molecule faces a higher barrier.",
-        "A good Elovich fit is one of the more specific pieces of evidence for a "
+        "consumed first, so each additional molecule faces a higher barrier."),
+        tr("A good Elovich fit is one of the more specific pieces of evidence for a "
         "heterogeneous surface, because the model has no plateau and cannot mimic a "
-        "simple saturating curve the way PSO can.",
+        "simple saturating curve the way PSO can."),
     ]
     if a * b > 0:
         out.append(
-            f"The product αβ = {fmt(a * b)} min⁻¹ sets where the logarithmic regime "
-            f"begins; the usual simplification q_t = (1/β)ln(αβ) + (1/β)ln t requires "
-            f"αβt ≫ 1, which holds here for t ≫ {fmt(1.0 / (a * b))} min. AdsorpFit "
-            f"fits the exact form q_t = (1/β)ln(1 + αβt) instead, so it stays valid "
-            f"at short times too."
+            tr("The product αβ = {v2} min⁻¹ sets where the logarithmic regime "
+            "begins; the usual simplification q_t = (1/β)ln(αβ) + (1/β)ln t requires "
+            "αβt ≫ 1, which holds here for t ≫ {v1} min. AdsorpFit "
+            "fits the exact form q_t = (1/β)ln(1 + αβt) instead, so it stays valid "
+            "at short times too.",
+                v2=fmt(a * b), v1=fmt(1.0 / (a * b)))
         )
     return out
 
@@ -324,30 +336,34 @@ def _avrami(t, qe, kav, nav):
 def _interp_avrami(f, ctx):
     n = f.params["nav"]
     out = [
-        f"q_e = {fmt(f.params['qe'])} mg/g, k_AV = {fmt(f.params['kav'])} min⁻¹, "
-        f"n_AV = {fmt(n)}.",
-        "The Avrami equation comes from nucleation-and-growth theory and was "
+        tr("q_e = {qe} mg/g, k_AV = {kav} min⁻¹, "
+        "n_AV = {n}.",
+            qe=fmt(f.params['qe']), kav=fmt(f.params['kav']), n=fmt(n)),
+        tr("The Avrami equation comes from nucleation-and-growth theory and was "
         "adapted to adsorption to allow a *fractional* reaction order. Its value is "
-        "that n_AV is not forced to 1 or 2; it is fitted, so the data choose.",
-        f"n_AV = {fmt(n)} is the fractional kinetic order. It reflects possible "
-        f"changes in the adsorption mechanism as the process advances, rather than "
-        f"a single elementary step.",
+        "that n_AV is not forced to 1 or 2; it is fitted, so the data choose."),
+        tr("n_AV = {n} is the fractional kinetic order. It reflects possible "
+        "changes in the adsorption mechanism as the process advances, rather than "
+        "a single elementary step.",
+            n=fmt(n)),
     ]
     if abs(n - 1) < 0.1:
-        out.append("n_AV ≈ 1 makes Avrami equivalent to pseudo-first-order.")
+        out.append(tr("n_AV ≈ 1 makes Avrami equivalent to pseudo-first-order."))
     elif abs(n - 2) < 0.15:
-        out.append("n_AV ≈ 2 puts the kinetics close to second-order behaviour.")
+        out.append(tr("n_AV ≈ 2 puts the kinetics close to second-order behaviour."))
     elif n < 1:
         out.append(
-            f"n_AV = {fmt(n)} below 1 indicates the rate decays faster than "
-            f"first-order at early times: often read as a broad distribution of "
-            f"site reactivities, or as diffusion beginning to limit the rate."
+            tr("n_AV = {n} below 1 indicates the rate decays faster than "
+            "first-order at early times: often read as a broad distribution of "
+            "site reactivities, or as diffusion beginning to limit the rate.",
+                n=fmt(n))
         )
     else:
         out.append(
-            f"n_AV = {fmt(n)} between 1 and 2 sits between first- and second-order "
-            f"behaviour, which is the common outcome and is the main argument for "
-            f"fitting Avrami rather than forcing PFO or PSO."
+            tr("n_AV = {n} between 1 and 2 sits between first- and second-order "
+            "behaviour, which is the common outcome and is the main argument for "
+            "fitting Avrami rather than forcing PFO or PSO.",
+                n=fmt(n))
         )
     return out
 
@@ -409,20 +425,23 @@ MIXED_12 = ModelSpec(
         "f₂ is the fraction of the process behaving as second order.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g, k = {fmt(f.params['k'])} min⁻¹, "
-        f"f₂ = {fmt(f.params['f2'])}.",
-        f"f₂ is the headline number: it is the fraction of the uptake behaving as "
-        f"second order. f₂ = {fmt(f.params['f2'])} means the process is "
-        + ("essentially pure pseudo-first-order; report PFO instead."
+        tr("q_e = {qe} mg/g, k = {k} min⁻¹, "
+        "f₂ = {f2}.",
+            qe=fmt(f.params['qe']), k=fmt(f.params['k']), f2=fmt(f.params['f2'])),
+        tr("f₂ is the headline number: it is the fraction of the uptake behaving as "
+        "second order. f₂ = {f2} means the process is ",
+            f2=fmt(f.params['f2']))
+        + (tr("essentially pure pseudo-first-order; report PFO instead.")
            if f.params['f2'] < 0.1 else
-           "essentially pure pseudo-second-order; report PSO instead."
+           tr("essentially pure pseudo-second-order; report PSO instead.")
            if f.params['f2'] > 0.9 else
-           f"genuinely mixed, roughly {f.params['f2'] * 100:.0f}% second-order in "
-           f"character. This is the case where MOE earns its extra parameter: "
-           f"neither PFO nor PSO alone is right."),
-        "MOE sidesteps the PFO-vs-PSO argument that dominates the adsorption "
+           tr("genuinely mixed, roughly {v1:.0f}% second-order in "
+           "character. This is the case where MOE earns its extra parameter: "
+           "neither PFO nor PSO alone is right.",
+               v1=f.params['f2'] * 100)),
+        tr("MOE sidesteps the PFO-vs-PSO argument that dominates the adsorption "
         "literature by letting the data decide the balance rather than forcing an "
-        "either/or.",
+        "either/or."),
     ],
 )
 
@@ -460,18 +479,20 @@ NTH_ORDER = ModelSpec(
         "A fitted n far from 1 or 2 means neither standard model is appropriate.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g, k_n = {fmt(f.params['kn'])}, "
-        f"n = {fmt(f.params['n'])}.",
-        f"The fitted order n = {fmt(f.params['n'])} is the result that matters. "
-        + ("It is close to 1, so pseudo-first-order is justified for these data."
+        tr("q_e = {qe} mg/g, k_n = {kn}, "
+        "n = {n}.",
+            qe=fmt(f.params['qe']), kn=fmt(f.params['kn']), n=fmt(f.params['n'])),
+        tr("The fitted order n = {n} is the result that matters. ",
+            n=fmt(f.params['n']))
+        + (tr("It is close to 1, so pseudo-first-order is justified for these data.")
            if abs(f.params['n'] - 1) < 0.2 else
-           "It is close to 2, so pseudo-second-order is justified."
+           tr("It is close to 2, so pseudo-second-order is justified.")
            if abs(f.params['n'] - 2) < 0.25 else
-           f"It is far from both 1 and 2, which means neither PFO nor PSO is the "
-           f"right description: forcing one of them onto these data would give a "
-           f"rate constant with no physical meaning."),
-        "Note that k_n's units depend on n, so k_n from this fit cannot be compared "
-        "with a k₁ or k₂ from PFO/PSO.",
+           tr("It is far from both 1 and 2, which means neither PFO nor PSO is the "
+           "right description: forcing one of them onto these data would give a "
+           "rate constant with no physical meaning.")),
+        tr("Note that k_n's units depend on n, so k_n from this fit cannot be compared "
+        "with a k₁ or k₂ from PFO/PSO."),
     ],
 )
 
@@ -509,18 +530,21 @@ RITCHIE = ModelSpec(
         "Assumes the rate depends only on the fraction of vacant sites.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g, k_R = {fmt(f.params['kR'])} min⁻¹, "
-        f"n = {fmt(f.params['n'])}.",
-        f"Unlike the empirical nth-order model, Ritchie's n has a physical "
-        f"referent: the number of surface sites occupied by a single adsorbate "
-        f"molecule. n = {fmt(f.params['n'])} therefore suggests "
-        + ("monodentate binding: one molecule per site."
+        tr("q_e = {qe} mg/g, k_R = {kR} min⁻¹, "
+        "n = {n}.",
+            qe=fmt(f.params['qe']), kR=fmt(f.params['kR']), n=fmt(f.params['n'])),
+        tr("Unlike the empirical nth-order model, Ritchie's n has a physical "
+        "referent: the number of surface sites occupied by a single adsorbate "
+        "molecule. n = {n} therefore suggests ",
+            n=fmt(f.params['n']))
+        + (tr("monodentate binding: one molecule per site.")
            if abs(f.params['n'] - 1) < 0.25 else
-           "bidentate binding: each molecule occupies two sites, which is common "
-           "for chelating metal complexes and carboxylate groups."
+           tr("bidentate binding: each molecule occupies two sites, which is common "
+           "for chelating metal complexes and carboxylate groups.")
            if abs(f.params['n'] - 2) < 0.4 else
-           f"roughly {f.params['n']:.1f} sites per molecule, a non-integer value "
-           f"that usually means the site picture is an oversimplification here."),
+           tr("roughly {n:.1f} sites per molecule, a non-integer value "
+           "that usually means the site picture is an oversimplification here.",
+               n=f.params['n'])),
     ],
 )
 
@@ -537,36 +561,39 @@ def _weber_morris(t, kid, C):
 def _interp_wm(f, ctx):
     kid = f.params["kid"]; C = f.params["C"]
     out = [
-        f"k_id = {fmt(kid)} mg g⁻¹ min⁻⁰·⁵ is the intraparticle diffusion rate "
-        f"constant, and C = {fmt(C)} mg/g is the intercept.",
-        "The intercept C is the informative parameter here, and it is what the "
+        tr("k_id = {kid} mg g⁻¹ min⁻⁰·⁵ is the intraparticle diffusion rate "
+        "constant, and C = {C} mg/g is the intercept.",
+            kid=fmt(kid), C=fmt(C)),
+        tr("The intercept C is the informative parameter here, and it is what the "
         "Weber–Morris plot is actually for. C is proportional to the thickness of "
-        "the boundary layer surrounding the particle.",
+        "the boundary layer surrounding the particle."),
     ]
     if abs(C) < 0.05 * max(1.0, float(np.max(f.y))):
         out.append(
-            f"C = {fmt(C)} mg/g is essentially zero, so the line passes through the "
-            f"origin. That is the specific condition under which intraparticle "
-            f"diffusion is the **sole** rate-limiting step, external film diffusion "
-            f"contributes nothing measurable."
+            tr("C = {C} mg/g is essentially zero, so the line passes through the "
+            "origin. That is the specific condition under which intraparticle "
+            "diffusion is the **sole** rate-limiting step, external film diffusion "
+            "contributes nothing measurable.",
+                C=fmt(C))
         )
     else:
         out.append(
-            f"C = {fmt(C)} mg/g is significantly greater than zero, so the plot does "
-            f"NOT pass through the origin. Intraparticle diffusion is therefore "
-            f"involved but is **not the only** rate-controlling step: film (boundary "
-            f"layer) diffusion contributes as well. The larger C is, the greater the "
-            f"boundary-layer contribution."
+            tr("C = {C} mg/g is significantly greater than zero, so the plot does "
+            "NOT pass through the origin. Intraparticle diffusion is therefore "
+            "involved but is **not the only** rate-controlling step: film (boundary "
+            "layer) diffusion contributes as well. The larger C is, the greater the "
+            "boundary-layer contribution.",
+                C=fmt(C))
         )
     out.append(
-        "Important methodological point: a single straight line fitted through all "
+        tr("Important methodological point: a single straight line fitted through all "
         "your q_t vs √t points is almost always the wrong analysis. The standard "
-        "interpretation requires you to identify *multiple linear regions*"
+        "interpretation requires you to identify *multiple linear regions*, "
         "typically an initial fast external surface adsorption stage, a second "
         "gradual stage where intraparticle diffusion is rate-limiting, and a final "
         "plateau as equilibrium is approached. Use the multi-region tool in "
         "AdsorpFit to segment the plot; each segment gets its own k_id and C, and "
-        "their relative slopes tell you which step controls the rate."
+        "their relative slopes tell you which step controls the rate.")
     )
     return out
 
@@ -634,18 +661,19 @@ FILM_DIFFUSION = ModelSpec(
         "interpretive, not algebraic.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g and k_fd = {fmt(f.params['kfd'])} min⁻¹.",
-        "Be aware that the film-diffusion equation is *algebraically identical* to "
+        tr("q_e = {qe} mg/g and k_fd = {kfd} min⁻¹.",
+            qe=fmt(f.params['qe']), kfd=fmt(f.params['kfd'])),
+        tr("Be aware that the film-diffusion equation is *algebraically identical* to "
         "pseudo-first-order. It will always give exactly the same R², SSE and "
         "curve. What differs is the claim you attach to it: PFO says the rate "
         "depends on free sites, film diffusion says the rate depends on transport "
-        "through the boundary layer. Fitting quality cannot distinguish them.",
-        "What can distinguish them is experiment: film diffusion is sensitive to "
+        "through the boundary layer. Fitting quality cannot distinguish them."),
+        tr("What can distinguish them is experiment: film diffusion is sensitive to "
         "stirring speed, PFO site-limited kinetics is not. If your rate constant "
         "changes when you change the agitation rate, film diffusion is real. The "
-        "Boyd plot in the diffusion panel makes the same test graphically"
+        "Boyd plot in the diffusion panel makes the same test graphically: "
         "a straight line through the origin indicates particle diffusion control, "
-        "while a non-zero intercept points to film diffusion.",
+        "while a non-zero intercept points to film diffusion."),
     ],
 )
 
@@ -679,16 +707,18 @@ BANGHAM = ModelSpec(
         "avoids the double logarithm's severe error distortion.",
     ],
     interpretation=lambda f, c: [
-        f"k₀ = {fmt(f.params['k0'])} and α = {fmt(f.params['alpha'])}.",
-        f"α = {fmt(f.params['alpha'])} is the diagnostic. "
-        + (f"Being below 1, it is consistent with diffusion into the pore network "
-           f"controlling the rate: uptake slows progressively as the adsorbate "
-           f"must travel further into the particle."
+        tr("k₀ = {k0} and α = {alpha}.",
+            k0=fmt(f.params['k0']), alpha=fmt(f.params['alpha'])),
+        tr("α = {alpha} is the diagnostic. ",
+            alpha=fmt(f.params['alpha']))
+        + (tr("Being below 1, it is consistent with diffusion into the pore network "
+           "controlling the rate: uptake slows progressively as the adsorbate "
+           "must travel further into the particle.")
            if f.params['alpha'] < 1 else
-           f"α ≥ 1 means uptake is not decelerating the way pore diffusion "
-           f"requires, which argues against pore-diffusion control."),
-        ("α ≈ 0.5 specifically recovers the Weber–Morris √t dependence, meaning "
-         "classical intraparticle diffusion."
+           tr("α ≥ 1 means uptake is not decelerating the way pore diffusion "
+           "requires, which argues against pore-diffusion control.")),
+        (tr("α ≈ 0.5 specifically recovers the Weber–Morris √t dependence, meaning "
+         "classical intraparticle diffusion.")
          if abs(f.params['alpha'] - 0.5) < 0.08 else ""),
     ],
 )
@@ -725,22 +755,25 @@ DOUBLE_EXP = ModelSpec(
         "single exponential cannot follow.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g. Fast step: a₁ = {fmt(f.params['a1'])} mg/g "
-        f"at k_D1 = {fmt(f.params['k1'])} min⁻¹. Slow step: "
-        f"{fmt(f.params['qe'] - f.params['a1'])} mg/g at k_D2 = "
-        f"{fmt(f.params['k2'])} min⁻¹.",
-        f"The two rate constants differ by a factor of "
-        f"{fmt(f.params['k1'] / f.params['k2']) if f.params['k2'] else 'n.d.'}. "
-        + ("That separation is large enough for the two steps to be genuinely "
+        tr("q_e = {qe} mg/g. Fast step: a₁ = {a1} mg/g "
+        "at k_D1 = {k1} min⁻¹. Slow step: "
+        "{v1} mg/g at k_D2 = "
+        "{k2} min⁻¹.",
+            qe=fmt(f.params['qe']), a1=fmt(f.params['a1']), k1=fmt(f.params['k1']), v1=fmt(f.params['qe'] - f.params['a1']), k2=fmt(f.params['k2'])),
+        tr("The two rate constants differ by a factor of "
+        "{v1}. ",
+            v1=fmt(f.params['k1'] / f.params['k2']) if f.params['k2'] else 'n.d.')
+        + (tr("That separation is large enough for the two steps to be genuinely "
            "distinguishable: usually fast adsorption on the external surface "
-           "followed by slow diffusion into the interior."
+           "followed by slow diffusion into the interior.")
            if f.params['k2'] and f.params['k1'] / f.params['k2'] > 5 else
-           "That separation is small, so the two exponentials are not well "
+           tr("That separation is small, so the two exponentials are not well "
            "distinguished and the extra parameters are probably not justified. "
-           "Check the standard errors before reporting both steps."),
-        f"The fast step accounts for "
-        f"{100 * f.params['a1'] / f.params['qe'] if f.params['qe'] else float('nan'):.0f}% "
-        f"of the total uptake.",
+           "Check the standard errors before reporting both steps.")),
+        tr("The fast step accounts for "
+        "{v1:.0f}% "
+        "of the total uptake.",
+            v1=100 * f.params['a1'] / f.params['qe'] if f.params['qe'] else float('nan')),
     ],
 )
 
@@ -778,17 +811,19 @@ FRACTAL_PFO = ModelSpec(
         "adsorbents where reactant and site cannot mix freely.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g, k₁′ = {fmt(f.params['k1'])}, "
-        f"h = {fmt(f.params['h'])}.",
-        f"The fractal exponent h = {fmt(f.params['h'])} is the point of this model. "
-        + ("h ≈ 0 means the rate constant really is constant and classical PFO is "
-           "adequate; the fractal correction is unnecessary here."
+        tr("q_e = {qe} mg/g, k₁′ = {k1}, "
+        "h = {h}.",
+            qe=fmt(f.params['qe']), k1=fmt(f.params['k1']), h=fmt(f.params['h'])),
+        tr("The fractal exponent h = {h} is the point of this model. ",
+            h=fmt(f.params['h']))
+        + (tr("h ≈ 0 means the rate constant really is constant and classical PFO is "
+           "adequate; the fractal correction is unnecessary here.")
            if f.params['h'] < 0.05 else
-           f"h > 0 means the effective rate constant decays with time as t^(−h). "
-           f"This is what happens on a geometrically disordered or fractal surface: "
-           f"the adsorbate and the remaining free sites become progressively "
-           f"segregated, so the encounter rate falls even though sites remain "
-           f"available. A larger h means stronger disorder."),
+           tr("h > 0 means the effective rate constant decays with time as t^(−h). "
+           "This is what happens on a geometrically disordered or fractal surface: "
+           "the adsorbate and the remaining free sites become progressively "
+           "segregated, so the encounter rate falls even though sites remain "
+           "available. A larger h means stronger disorder.")),
     ],
 )
 
@@ -856,17 +891,18 @@ CRANK = ModelSpec(
         "D and r are strongly correlated, fix r at its measured value.",
     ],
     interpretation=lambda f, c: [
-        f"q_e = {fmt(f.params['qe'])} mg/g, D = {fmt(f.params['D'])} cm²/min, "
-        f"r = {fmt(f.params['r'])} cm.",
-        f"D is the effective intraparticle diffusion coefficient and is the only "
-        f"parameter here with transferable physical meaning. "
-        + ("Values around 10⁻¹¹–10⁻¹³ cm²/s indicate strongly hindered pore "
+        tr("q_e = {qe} mg/g, D = {D} cm²/min, "
+        "r = {r} cm.",
+            qe=fmt(f.params['qe']), D=fmt(f.params['D']), r=fmt(f.params['r'])),
+        tr("D is the effective intraparticle diffusion coefficient and is the only "
+        "parameter here with transferable physical meaning. ")
+        + (tr("Values around 10⁻¹¹–10⁻¹³ cm²/s indicate strongly hindered pore "
            "diffusion typical of microporous adsorbents; values near the "
            "free-solution value (~10⁻⁵ cm²/s) mean the pore network offers little "
-           "resistance."),
-        "Because D appears only as D/r², it is perfectly correlated with the "
+           "resistance.")),
+        tr("Because D appears only as D/r², it is perfectly correlated with the "
         "particle radius. If you fitted r rather than fixing it at a measured "
-        "value, neither number is meaningful on its own, only the ratio is.",
+        "value, neither number is meaningful on its own, only the ratio is."),
     ],
 )
 
@@ -890,13 +926,14 @@ def _reaches_equilibrium(x, y, ctx):
     if ratio > 0.15 or rise > 0.25:
         return [issue(
             "warn", "no_equilibrium",
-            f"Uptake is still climbing at your last time point: the slope over "
-            f"the final quarter of the run is {ratio * 100:.0f}% of the average "
-            f"slope, and the last third accounts for {rise * 100:.0f}% of the "
-            f"total change in q_t. At equilibrium both would be near zero. "
-            f"Any q_e this model reports is an extrapolation beyond the "
-            f"measured window, and the rate constant is correlated with it, so "
-            f"both numbers are soft. Run the experiment longer if q_e matters.")]
+            tr("Uptake is still climbing at your last time point: the slope over "
+            "the final quarter of the run is {v2:.0f}% of the average "
+            "slope, and the last third accounts for {v1:.0f}% of the "
+            "total change in q_t. At equilibrium both would be near zero. "
+            "Any q_e this model reports is an extrapolation beyond the "
+            "measured window, and the rate constant is correlated with it, so "
+            "both numbers are soft. Run the experiment longer if q_e matters.",
+                v2=ratio * 100, v1=rise * 100))]
     return []
 
 
@@ -913,10 +950,11 @@ def _early_resolution(x, y, ctx):
     if early < 2:
         return [issue(
             "warn", "sparse_early",
-            f"Only {early} point(s) were measured before half the final uptake was "
-            f"reached. The rate constant is determined almost entirely by that "
-            f"early region, so with this sampling it is poorly constrained however "
-            f"tight the confidence interval looks. Add earlier time points.")]
+            tr("Only {early} point(s) were measured before half the final uptake was "
+            "reached. The rate constant is determined almost entirely by that "
+            "early region, so with this sampling it is poorly constrained however "
+            "tight the confidence interval looks. Add earlier time points.",
+                early=early))]
     return []
 
 
@@ -929,11 +967,11 @@ def _elovich_domain(x, y, ctx):
             if terminal_slope_ratio(x, y) < 0.05:
                 out.append(issue(
                     "warn", "elovich_plateau",
-                    "Your data have clearly reached a plateau. The Elovich equation "
+                    tr("Your data have clearly reached a plateau. The Elovich equation "
                     "has no equilibrium plateau: it rises logarithmically without "
                     "limit: so it cannot reproduce the flat region and will "
                     "systematically overshoot at long times. It suits data still in "
-                    "the rising, chemisorption-controlled stage."))
+                    "the rising, chemisorption-controlled stage.")))
     return out
 
 
@@ -945,23 +983,24 @@ def _weber_morris_validity(p, x, y, ctx):
         t_zero = (C / kid) ** 2
         out.append(issue(
             "warn", "wm_negative_intercept",
-            f"The fitted intercept C = {fmt(C)} mg/g is negative, so the line "
-            f"predicts a negative loading for all t below {fmt(t_zero)} min. C is "
-            f"meant to be proportional to boundary-layer thickness and cannot be "
-            f"negative physically. This is the usual sign that a single straight "
-            f"line has been forced through what are really two or three distinct "
-            f"diffusion stages; use the multi-region analysis on the Diffusion "
-            f"tab instead of this single-line fit."))
+            tr("The fitted intercept C = {C} mg/g is negative, so the line "
+            "predicts a negative loading for all t below {t_zero} min. C is "
+            "meant to be proportional to boundary-layer thickness and cannot be "
+            "negative physically. This is the usual sign that a single straight "
+            "line has been forced through what are really two or three distinct "
+            "diffusion stages; use the multi-region analysis on the Diffusion "
+            "tab instead of this single-line fit.",
+                C=fmt(C), t_zero=fmt(t_zero))))
     return out
 
 
 def _weber_morris_domain(x, y, ctx):
     return [issue(
         "info", "wm_single_line",
-        "Fitted here as one straight line over all points. That is almost never "
+        tr("Fitted here as one straight line over all points. That is almost never "
         "the right analysis: the standard interpretation requires identifying "
         "separate linear regions. The Diffusion tab does that segmentation and is "
-        "what you should report.")]
+        "what you should report."))]
 
 
 def _double_exp_validity(p, x, y, ctx):
@@ -969,19 +1008,21 @@ def _double_exp_validity(p, x, y, ctx):
     if a1 > qe:
         return [issue(
             "warn", "de_amplitude",
-            f"The fast-step amplitude a₁ = {fmt(a1)} mg/g exceeds the total "
-            f"capacity q_e = {fmt(qe)} mg/g, which makes the slow step's amplitude "
-            f"negative: i.e. the model is describing desorption in the second "
-            f"stage. That is rarely intended; the two exponentials are probably "
-            f"not separable in these data.")]
+            tr("The fast-step amplitude a₁ = {a1} mg/g exceeds the total "
+            "capacity q_e = {qe} mg/g, which makes the slow step's amplitude "
+            "negative: i.e. the model is describing desorption in the second "
+            "stage. That is rarely intended; the two exponentials are probably "
+            "not separable in these data.",
+                a1=fmt(a1), qe=fmt(qe)))]
     k1, k2 = p.get("k1", 0.0), p.get("k2", 0.0)
     if k2 > 0 and 0.2 < k1 / k2 < 5:
         return [issue(
             "warn", "de_unseparated",
-            f"The two rate constants differ by only a factor of {fmt(k1 / k2)}. "
-            f"Two exponentials that close together are not distinguishable from a "
-            f"single one: the extra two parameters are fitting noise. Prefer the "
-            f"pseudo-first-order model unless the standard errors say otherwise.")]
+            tr("The two rate constants differ by only a factor of {v1}. "
+            "Two exponentials that close together are not distinguishable from a "
+            "single one: the extra two parameters are fitting noise. Prefer the "
+            "pseudo-first-order model unless the standard errors say otherwise.",
+                v1=fmt(k1 / k2)))]
     return []
 
 
@@ -990,18 +1031,18 @@ def _crank_domain(x, y, ctx):
     if not ctx.get("particle_radius"):
         out.append(issue(
             "warn", "crank_radius",
-            "D and r enter this model only as D/r², so they cannot be determined "
+            tr("D and r enter this model only as D/r², so they cannot be determined "
             "separately. Enter your measured particle radius in the experiment "
             "panel and treat D as the single fitted quantity; otherwise neither "
-            "number means anything on its own."))
+            "number means anything on its own.")))
     return out
 
 
 def _bangham_domain(x, y, ctx):
     if np.any(np.asarray(x) <= 0):
         return [issue("info", "bangham_t0",
-                      "The Bangham power law is undefined at t = 0; that point is "
-                      "handled by clamping and contributes little to the fit.")]
+                      tr("The Bangham power law is undefined at t = 0; that point is "
+                      "handled by clamping and contributes little to the fit."))]
     return []
 
 
