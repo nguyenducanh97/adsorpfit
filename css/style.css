@@ -630,9 +630,16 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 :root[data-motion="off"] .ba-pts circle,
 :root[data-motion="off"] .ba-curve { animation: none; opacity: .9; }
 :root[data-motion="off"] .ba-curve { stroke-dashoffset: 0; opacity: 1; }
+
+/* Guarded on data-motion being absent for the same reason as the water
+   background: the operating system's reduce-motion setting picks the
+   default, but it must not outrank a reader who has chosen Full here. The
+   loading screen is on screen from the first paint, a moment before Prefs
+   has written the attribute, so this does hold briefly and then gives way. */
 @media (prefers-reduced-motion: reduce) {
-  .ba-mol circle, .ba-pts circle { animation: none; opacity: .9; }
-  .ba-curve { animation: none; stroke-dashoffset: 0; }
+  :root:not([data-motion]) .ba-mol circle,
+  :root:not([data-motion]) .ba-pts circle { animation: none; opacity: .9; }
+  :root:not([data-motion]) .ba-curve { animation: none; stroke-dashoffset: 0; }
 }
 
 .spinner-inline {
