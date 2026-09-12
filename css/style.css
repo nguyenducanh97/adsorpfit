@@ -180,20 +180,14 @@ body {
   100% { transform: translate3d(-12px, -102vh, 0) scale(1.12); opacity: 0; }
 }
 
-/* The operating system's "reduce motion" setting decides the DEFAULT, and
-   Prefs applies it by setting data-motion to "off" on first visit. It must
-   not override a choice made here afterwards: a reader who opens Settings
-   and picks Full is asking for motion on this page whatever Windows or
-   macOS says globally. So these rules apply only while data-motion is
-   absent, which is the moment before Prefs has run. Once the attribute is
-   set, the data-motion rules further down govern, and nothing here carries
-   !important into a fight with them. */
+/* Motion is governed by data-motion and by nothing else. The operating
+   system's reduce-motion setting picks the default for a first-time
+   visitor, which the inline script in the head of index.html applies
+   before the first paint, so the attribute is always present by the time
+   any of this is evaluated. Deciding it in two places is what produced the
+   original bug, where a stylesheet rule keyed on the system setting
+   outranked the reader's own choice and no setting in the app could win. */
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion]) .wave-1,
-  :root:not([data-motion]) .wave-2,
-  :root:not([data-motion]) .wave-3,
-  :root:not([data-motion]) .bubble { animation: none; }
-  :root:not([data-motion]) .bubble { opacity: 0.25; }
   html { scroll-behavior: auto; }
 }
 
@@ -631,16 +625,11 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
 :root[data-motion="off"] .ba-curve { animation: none; opacity: .9; }
 :root[data-motion="off"] .ba-curve { stroke-dashoffset: 0; opacity: 1; }
 
-/* Guarded on data-motion being absent for the same reason as the water
-   background: the operating system's reduce-motion setting picks the
-   default, but it must not outrank a reader who has chosen Full here. The
-   loading screen is on screen from the first paint, a moment before Prefs
-   has written the attribute, so this does hold briefly and then gives way. */
-@media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion]) .ba-mol circle,
-  :root:not([data-motion]) .ba-pts circle { animation: none; opacity: .9; }
-  :root:not([data-motion]) .ba-curve { animation: none; stroke-dashoffset: 0; }
-}
+/* No prefers-reduced-motion rule here on purpose. The rule above, keyed on
+   data-motion, is the only thing that stops this figure, and the attribute
+   is set before the first paint. A reader who asks for reduced motion at
+   the operating system level gets data-motion="off" by default and so gets
+   the still figure; a reader who then chooses Full gets the animation. */
 
 .spinner-inline {
   width: 14px; height: 14px; border: 2px solid var(--border);
