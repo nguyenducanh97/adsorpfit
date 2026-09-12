@@ -169,17 +169,31 @@ body {
   will-change: transform, opacity;
 }
 
+/* Opacity is lower than it was because there are now many more bubbles:
+   density and per-bubble weight trade off against each other, and the point
+   is a background you can ignore while reading. */
 @keyframes rise {
   0%   { transform: translate3d(0, 0, 0) scale(0.65); opacity: 0; }
-  12%  { opacity: 0.62; }
-  50%  { transform: translate3d(22px, -46vh, 0) scale(1); }
-  88%  { opacity: 0.44; }
-  100% { transform: translate3d(-14px, -102vh, 0) scale(1.12); opacity: 0; }
+  12%  { opacity: 0.46; }
+  50%  { transform: translate3d(18px, -46vh, 0) scale(1); }
+  88%  { opacity: 0.30; }
+  100% { transform: translate3d(-12px, -102vh, 0) scale(1.12); opacity: 0; }
 }
 
+/* The operating system's "reduce motion" setting decides the DEFAULT, and
+   Prefs applies it by setting data-motion to "off" on first visit. It must
+   not override a choice made here afterwards: a reader who opens Settings
+   and picks Full is asking for motion on this page whatever Windows or
+   macOS says globally. So these rules apply only while data-motion is
+   absent, which is the moment before Prefs has run. Once the attribute is
+   set, the data-motion rules further down govern, and nothing here carries
+   !important into a fight with them. */
 @media (prefers-reduced-motion: reduce) {
-  .wave-1, .wave-2, .wave-3, .bubble { animation: none !important; }
-  .bubble { opacity: 0.25; }
+  :root:not([data-motion]) .wave-1,
+  :root:not([data-motion]) .wave-2,
+  :root:not([data-motion]) .wave-3,
+  :root:not([data-motion]) .bubble { animation: none; }
+  :root:not([data-motion]) .bubble { opacity: 0.25; }
   html { scroll-behavior: auto; }
 }
 
