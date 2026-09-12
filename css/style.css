@@ -498,26 +498,128 @@ details.sty > .sb { padding: 12px; border-top: 1px solid var(--border); }
    Loading / boot
    ========================================================================== */
 
+/* The veil is deliberately translucent. The water behind it is the only
+   thing moving during the ten to twenty seconds Pyodide takes to arrive,
+   and hiding it behind an opaque panel made the wait feel broken. */
+:root { --boot-veil: rgba(234, 242, 246, 0.70); }
+:root[data-theme="dark"] { --boot-veil: rgba(6, 14, 23, 0.72); }
+
 #boot {
   position: fixed; inset: 0; z-index: 200;
   display: grid; place-items: center;
-  background: var(--bg);
+  background: var(--boot-veil);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   transition: opacity .5s, visibility .5s;
 }
 #boot.done { opacity: 0; visibility: hidden; }
-.boot-card { text-align: center; max-width: 400px; padding: 30px; }
-.boot-ring {
-  width: 64px; height: 64px; margin: 0 auto 22px; position: relative;
+.boot-card {
+  text-align: center; width: min(560px, calc(100vw - 32px));
+  padding: 30px 34px 26px;
+  background: var(--surface-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
 }
-.boot-ring svg { animation: spin 2.4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.boot-title { font-size: 21px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 7px; }
-.boot-msg { font-size: 13.5px; color: var(--text-2); min-height: 40px; }
+.boot-title {
+  font-size: 34px; font-weight: 700; letter-spacing: -1px; line-height: 1.1;
+}
+.boot-title b { color: var(--accent); font-weight: 700; }
+.boot-tagline {
+  font-size: 13px; color: var(--text-2); margin: 6px 0 4px;
+}
+.boot-msg { font-size: 12.5px; color: var(--text-3); margin-top: 9px; min-height: 18px; }
 .boot-bar { height: 4px; background: var(--border); border-radius: 2px;
-  overflow: hidden; margin-top: 18px; }
+  overflow: hidden; margin-top: 16px; }
 .boot-bar > i { display: block; height: 100%; width: 0;
   background: linear-gradient(90deg, var(--aqua-400), var(--ocean-600));
   transition: width .4s ease; }
+
+/* While the runtime downloads, the page behind the veil steps back so the
+   water is the only thing moving. Without this the frosted panels show
+   through and the motion the card sits on is lost. #boot precedes them all
+   in the markup, which is what makes the sibling selector possible. */
+#boot ~ header.masthead, #boot ~ main, #boot ~ footer.site-foot {
+  transition: opacity .7s ease .2s;
+}
+#boot:not(.done) ~ header.masthead,
+#boot:not(.done) ~ main,
+#boot:not(.done) ~ footer.site-foot { opacity: 0; pointer-events: none; }
+
+/* One sentence of real adsorption science, changed every few seconds.
+   Held at a fixed height so nothing below it shifts when the text swaps.
+   The text lives in its own span: as a bare text node beside <b> it would
+   become a second flex item and break into a column of its own. */
+.boot-fact {
+  min-height: 46px; margin: 4px auto 0; max-width: 480px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12.8px; line-height: 1.55; color: var(--text-2);
+  transition: opacity .45s ease;
+}
+.boot-fact.swap { opacity: 0; }
+.boot-fact b { color: var(--text); font-weight: 600; }
+.boot-fact sub { font-size: .72em; line-height: 0; vertical-align: -0.28em; }
+
+.boot-brand {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.boot-brand .mark { height: 21px; opacity: .9; }
+.boot-brand .vr { height: 22px; }
+.boot-by { font-size: 11.5px; color: var(--text-3); margin: 8px 0 0; line-height: 1.5; }
+.boot-by b { color: var(--text-2); font-weight: 600; }
+.boot-privacy { font-size: 10.8px; color: var(--text-3); margin: 9px 0 0; line-height: 1.45; }
+
+/* ---------- the adsorption figure on the loading screen ---------- */
+/* overflow is clipped so the adsorbate enters cleanly at the top edge
+   instead of appearing over the tagline on its way down */
+.boot-art { width: 100%; height: auto; margin: 12px 0 2px; display: block;
+  overflow: hidden; }
+.ba-slab { fill: var(--text-3); opacity: .30; }
+.ba-sites rect { fill: var(--accent); opacity: .45; }
+.ba-hatch path { stroke: var(--text-3); stroke-width: 1.4; opacity: .30; }
+.ba-rule { stroke: var(--border-strong); stroke-width: 1; opacity: .5; }
+.ba-axis { stroke: var(--text-3); stroke-width: 1.4; opacity: .7; }
+.ba-asym { stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .55; }
+.ba-curve { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+.ba-lab { fill: var(--text-3); font-size: 11px; font-family: var(--sans); }
+.ba-mol circle { fill: var(--accent); opacity: 0; }
+.ba-pts circle { fill: var(--accent); opacity: 0; }
+
+.ba-mol circle { animation: ba-adsorb 9s cubic-bezier(.34, .1, .3, 1) infinite; }
+.ba-pts circle { animation: ba-pop 9s linear infinite; }
+.ba-curve { stroke-dasharray: 237; animation: ba-draw 9s ease-out infinite; }
+
+@keyframes ba-adsorb {
+  0%        { transform: translateY(-126px); opacity: 0; }
+  5%        { opacity: .9; }
+  18%       { transform: translateY(0); }
+  21%       { transform: translateY(-4px); }
+  24%, 86%  { transform: translateY(0); opacity: .9; }
+  96%, 100% { transform: translateY(0); opacity: 0; }
+}
+@keyframes ba-pop {
+  0%, 3%    { opacity: 0; }
+  9%, 86%   { opacity: .9; }
+  96%, 100% { opacity: 0; }
+}
+@keyframes ba-draw {
+  0%        { stroke-dashoffset: 237; opacity: 0; }
+  5%        { opacity: 1; }
+  48%, 88%  { stroke-dashoffset: 0; opacity: 1; }
+  97%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+/* With motion off, the figure still says what it means: a full monolayer
+   and a finished curve, simply held still. */
+:root[data-motion="off"] .ba-mol circle,
+:root[data-motion="off"] .ba-pts circle,
+:root[data-motion="off"] .ba-curve { animation: none; opacity: .9; }
+:root[data-motion="off"] .ba-curve { stroke-dashoffset: 0; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ba-mol circle, .ba-pts circle { animation: none; opacity: .9; }
+  .ba-curve { animation: none; stroke-dashoffset: 0; }
+}
 
 .spinner-inline {
   width: 14px; height: 14px; border: 2px solid var(--border);

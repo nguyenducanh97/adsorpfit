@@ -202,17 +202,43 @@
 
   /* ==================================================================== boot */
 
-  const BOOT_STEPS = [
-    "Downloading the Python runtime…",
-    "Loading NumPy and SciPy…",
-    "Loading Matplotlib and Pillow…",
-    "Loading the AdsorpFit model library…",
-    "Ready."
-  ];
+  const N_BOOT_STEPS = 5;          // boot.step.0 through boot.step.4
 
   function bootMsg(i, extra) {
-    $("#boot-msg").textContent = BOOT_STEPS[i] + (extra ? " " + extra : "");
-    $("#boot-bar").style.width = ((i + 1) / BOOT_STEPS.length * 100) + "%";
+    $("#boot-msg").textContent = I18N.t("boot.step." + i) + (extra ? " " + extra : "");
+    $("#boot-bar").style.width = ((i + 1) / N_BOOT_STEPS * 100) + "%";
+  }
+
+  // Ten to twenty seconds is a long time to look at a progress bar. These
+  // lines use it to say something true about how the fitting works, each
+  // one a decision the site actually acts on rather than a slogan.
+  const N_FACTS = 7;
+
+  function startBootFacts() {
+    const host = $("#boot-fact");
+    if (!host) return;
+    let i = Math.floor(Math.random() * N_FACTS);   // not always the same first line
+    // one wrapper element, so the flex centring treats the line as a whole
+    const show = function () {
+      host.innerHTML = "<span>" + I18N.t("boot.fact." + i) + "</span>";
+    };
+    show();
+    I18N.onChange(show);
+
+    const timer = setInterval(function () {
+      if (!document.getElementById("boot") ||
+          $("#boot").classList.contains("done")) {
+        clearInterval(timer);
+        return;
+      }
+      i = (i + 1) % N_FACTS;
+      if (document.documentElement.getAttribute("data-motion") === "off") {
+        show();
+        return;
+      }
+      host.classList.add("swap");
+      setTimeout(function () { show(); host.classList.remove("swap"); }, 450);
+    }, 4600);
   }
 
   async function boot() {
@@ -3507,6 +3533,7 @@
     I18N.init();
     Prefs.init();
     I18N.apply(document);
+    startBootFacts();
     wire();
     Layout.init();
     boot();
