@@ -43,6 +43,7 @@ import numpy as np
 from scipy import stats as sps
 
 from core import R_GAS, WATER_MOLARITY, fmt
+from lang import tr
 
 
 # --------------------------------------------------------------------------
@@ -137,36 +138,42 @@ def dimensionless_K(route: str, values: dict) -> dict:
         mw = float(values["MW"])                  # g/mol
         kl_molar = kl * mw * 1000.0               # L/mg * g/mol * mg/g = L/mol
         k0 = kl_molar * WATER_MOLARITY
-        detail = (f"K_L = {fmt(kl)} L/mg × {fmt(mw)} g/mol × 1000 mg/g "
-                  f"= {fmt(kl_molar)} L/mol; × 55.5 mol/L → K° = {fmt(k0)}")
+        detail = (tr("K_L = {kl} L/mg × {mw} g/mol × 1000 mg/g "
+                  "= {kl_molar} L/mol; × 55.5 mol/L → K° = {k0}",
+            kl=fmt(kl), mw=fmt(mw), kl_molar=fmt(kl_molar), k0=fmt(k0)))
     elif route == "kd_density":
         kd = float(values["K_D"])
         k0 = kd * 1000.0
-        detail = f"K_D = {fmt(kd)} L/g × 1000 g/L → K° = {fmt(k0)}"
+        detail = tr("K_D = {kd} L/g × 1000 g/L → K° = {k0}",
+            kd=fmt(kd), k0=fmt(k0))
     elif route == "kc_dimensionless":
         k0 = float(values["K_C"])
-        detail = f"K_C = {fmt(k0)} (dimensionless by construction)"
+        detail = tr("K_C = {k0} (dimensionless by construction)",
+            k0=fmt(k0))
     elif route == "redlich_peterson":
         krp = float(values["K_RP"])
         k0 = krp * 1000.0
-        detail = f"K_RP = {fmt(krp)} L/g × 1000 g/L → K° = {fmt(k0)}"
+        detail = tr("K_RP = {krp} L/g × 1000 g/L → K° = {k0}",
+            krp=fmt(krp), k0=fmt(k0))
     elif route == "freundlich":
         k0 = float(values["K_F"])
-        detail = f"K_F = {fmt(k0)} used directly (dimensionally invalid)"
+        detail = tr("K_F = {k0} used directly (dimensionally invalid)",
+            k0=fmt(k0))
     else:                                          # direct
         k0 = float(values["K0"])
         detail = f"K° = {fmt(k0)} supplied directly"
 
     if k0 <= 0:
-        warn.append("K° is not positive, so ln K° is undefined and no "
-                    "thermodynamic parameters can be computed.")
+        warn.append(tr("K° is not positive, so ln K° is undefined and no "
+                    "thermodynamic parameters can be computed."))
     elif k0 < 1:
         warn.append(
-            f"K° = {fmt(k0)} is less than 1, so ln K° is negative and ΔG° will come "
-            f"out positive: i.e. the analysis says adsorption is non-spontaneous "
-            f"under standard-state conditions. That is a legitimate result, but if "
-            f"your adsorbent clearly works, it usually means the K° conversion is "
-            f"wrong rather than the thermodynamics."
+            tr("K° = {k0} is less than 1, so ln K° is negative and ΔG° will come "
+            "out positive: i.e. the analysis says adsorption is non-spontaneous "
+            "under standard-state conditions. That is a legitimate result, but if "
+            "your adsorbent clearly works, it usually means the K° conversion is "
+            "wrong rather than the thermodynamics.",
+                k0=fmt(k0))
         )
 
     return {"K0": k0, "route": route, "detail": detail,
@@ -204,10 +211,10 @@ def vant_hoff(T: np.ndarray, K0: np.ndarray, nonlinear: bool = False) -> dict:
         return out
     if T.size < 3:
         out["warnings"].append(
-            "Only two temperatures were supplied. A two-point van't Hoff line has "
+            tr("Only two temperatures were supplied. A two-point van't Hoff line has "
             "zero residual degrees of freedom: ΔH° and ΔS° can be computed but "
             "have no uncertainty estimate and R² is meaningless (it is always 1). "
-            "Three temperatures is the practical minimum; four or five is better."
+            "Three temperatures is the practical minimum; four or five is better.")
         )
 
     invT = 1.0 / T
@@ -237,18 +244,20 @@ def vant_hoff(T: np.ndarray, K0: np.ndarray, nonlinear: bool = False) -> dict:
     out["dG_gap_kJ_mol"] = float(gap)
     if gap > 1.0:
         out["warnings"].append(
-            f"ΔG° computed directly from each K° and ΔG° computed from ΔH° − TΔS° "
-            f"differ by up to {gap:.2f} kJ/mol. That gap means the van't Hoff plot "
-            f"is curved: ΔH° is not constant across your temperature range, so a "
-            f"single ΔH° value misrepresents the system. Consider the non-linear "
-            f"van't Hoff form with a heat-capacity term, or report ΔH° as a range."
+            tr("ΔG° computed directly from each K° and ΔG° computed from ΔH° − TΔS° "
+            "differ by up to {gap:.2f} kJ/mol. That gap means the van't Hoff plot "
+            "is curved: ΔH° is not constant across your temperature range, so a "
+            "single ΔH° value misrepresents the system. Consider the non-linear "
+            "van't Hoff form with a heat-capacity term, or report ΔH° as a range.",
+                gap=gap)
         )
     if out["R2"] < 0.95 and T.size >= 3:
         out["warnings"].append(
-            f"The van't Hoff regression has R² = {out['R2']:.4f}. Below about 0.95 "
-            f"the extracted ΔH° and ΔS° are not reliable; check for an outlying "
-            f"temperature or a K° conversion that varies with temperature in a way "
-            f"the model does not capture."
+            tr("The van't Hoff regression has R² = {R2:.4f}. Below about 0.95 "
+            "the extracted ΔH° and ΔS° are not reliable; check for an outlying "
+            "temperature or a K° conversion that varies with temperature in a way "
+            "the model does not capture.",
+                R2=out['R2'])
         )
 
     if nonlinear and T.size >= 4:
@@ -281,9 +290,10 @@ def _vant_hoff_cp(T, lnK, T_ref=298.15):
             "dS_J_mol_K": p[1], "dS_se_J_mol_K": se[1],
             "dCp_J_mol_K": p[2], "dCp_se_J_mol_K": se[2],
             "R2": 1.0 - ss / sst if sst > 0 else np.nan,
-            "note": "ΔH° and ΔS° are reported at the reference temperature "
-                    f"{T_ref} K. A non-zero ΔCp means the van't Hoff plot is "
+            "note": tr("ΔH° and ΔS° are reported at the reference temperature "
+                    "{T_ref} K. A non-zero ΔCp means the van't Hoff plot is "
                     "genuinely curved and ΔH° changes with temperature.",
+                T_ref=T_ref),
         }
     except Exception as exc:
         return {"error": str(exc)}
@@ -302,10 +312,11 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
 
     if route_info:
         out.append(
-            f"Equilibrium constant route: {K_ROUTES[route_info['route']]['label']}. "
-            f"{route_info['detail']}. This choice is not cosmetic: a different "
-            f"route gives a different ΔG°, so it must be stated explicitly in any "
-            f"paper reporting these numbers."
+            tr("Equilibrium constant route: {v1}. "
+            "{detail}. This choice is not cosmetic: a different "
+            "route gives a different ΔG°, so it must be stated explicitly in any "
+            "paper reporting these numbers.",
+                v1=K_ROUTES[route_info['route']]['label'], detail=route_info['detail'])
         )
 
     # dG
@@ -313,103 +324,115 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
     if spont:
         trend = "more negative" if dG[-1] < dG[0] else "less negative"
         out.append(
-            f"ΔG° is negative at every temperature ({fmt(dG[0])} to {fmt(dG[-1])} "
-            f"kJ/mol from {T[0]:.0f} to {T[-1]:.0f} K), so adsorption is "
-            f"**spontaneous** and thermodynamically favourable across your whole "
-            f"range. ΔG° becomes {trend} as temperature rises, meaning the driving "
-            f"force {'increases' if dG[-1] < dG[0] else 'decreases'} with heating."
+            tr("ΔG° is negative at every temperature ({v5} to {v4} "
+            "kJ/mol from {v3:.0f} to {v2:.0f} K), so adsorption is "
+            "**spontaneous** and thermodynamically favourable across your whole "
+            "range. ΔG° becomes {trend} as temperature rises, meaning the driving "
+            "force {v1} with heating.",
+                v5=fmt(dG[0]), v4=fmt(dG[-1]), v3=T[0], v2=T[-1], trend=trend, v1='increases' if dG[-1] < dG[0] else 'decreases')
         )
     else:
         out.append(
-            f"ΔG° is not negative at all temperatures ({fmt(min(dG))} to "
-            f"{fmt(max(dG))} kJ/mol). A positive ΔG° means adsorption is "
-            f"non-spontaneous under standard-state conditions at that temperature. "
-            f"Before reporting this, check the K° conversion, because a positive ΔG° for "
-            f"an adsorbent that demonstrably removes the solute almost always "
-            f"signals a units problem rather than real thermodynamics."
+            tr("ΔG° is not negative at all temperatures ({v2} to "
+            "{v1} kJ/mol). A positive ΔG° means adsorption is "
+            "non-spontaneous under standard-state conditions at that temperature. "
+            "Before reporting this, check the K° conversion, because a positive ΔG° for "
+            "an adsorbent that demonstrably removes the solute almost always "
+            "signals a units problem rather than real thermodynamics.",
+                v2=fmt(min(dG)), v1=fmt(max(dG)))
         )
 
     mag = float(np.mean(np.abs(dG)))
     if mag < 20:
         out.append(
-            f"The magnitude of ΔG° (mean |ΔG°| ≈ {fmt(mag)} kJ/mol) lies in the "
-            f"0–20 kJ/mol range conventionally assigned to **physisorption**"
-            f"the adsorbate is held by van der Waals forces, hydrogen bonding or "
-            f"weak electrostatics."
+            tr("The magnitude of ΔG° (mean |ΔG°| ≈ {mag} kJ/mol) lies in the "
+            "0–20 kJ/mol range conventionally assigned to **physisorption**, "
+            "where the adsorbate is held by van der Waals forces, hydrogen bonding or "
+            "weak electrostatics.",
+                mag=fmt(mag))
         )
     elif mag <= 80:
         out.append(
-            f"The magnitude of ΔG° (mean |ΔG°| ≈ {fmt(mag)} kJ/mol) falls in the "
-            f"20–80 kJ/mol range usually taken to indicate a contribution from "
-            f"**chemisorption** alongside physical interactions."
+            tr("The magnitude of ΔG° (mean |ΔG°| ≈ {mag} kJ/mol) falls in the "
+            "20–80 kJ/mol range usually taken to indicate a contribution from "
+            "**chemisorption** alongside physical interactions.",
+                mag=fmt(mag))
         )
     else:
         out.append(
-            f"Mean |ΔG°| ≈ {fmt(mag)} kJ/mol exceeds 80 kJ/mol, which would imply "
-            f"strong chemisorption. Values this large are unusual in aqueous "
-            f"adsorption and are worth re-checking against the K° conversion."
+            tr("Mean |ΔG°| ≈ {mag} kJ/mol exceeds 80 kJ/mol, which would imply "
+            "strong chemisorption. Values this large are unusual in aqueous "
+            "adsorption and are worth re-checking against the K° conversion.",
+                mag=fmt(mag))
         )
 
     # dH
     if dH > 0:
         out.append(
-            f"ΔH° = {fmt(dH)} kJ/mol is **positive**, so adsorption is "
-            f"**endothermic**: the system absorbs heat, and uptake improves as "
-            f"temperature rises. This normally means the energy required to "
-            f"dehydrate the adsorbate (strip its solvation shell) before it can "
-            f"reach the surface exceeds the energy released on binding."
+            tr("ΔH° = {dH} kJ/mol is **positive**, so adsorption is "
+            "**endothermic**: the system absorbs heat, and uptake improves as "
+            "temperature rises. This normally means the energy required to "
+            "dehydrate the adsorbate (strip its solvation shell) before it can "
+            "reach the surface exceeds the energy released on binding.",
+                dH=fmt(dH))
         )
     else:
         out.append(
-            f"ΔH° = {fmt(dH)} kJ/mol is **negative**, so adsorption is "
-            f"**exothermic**: heat is released on binding, and uptake falls as "
-            f"temperature rises. Practically, this means running the process cold "
-            f"gives higher capacity, and it makes thermal regeneration of the "
-            f"adsorbent straightforward."
+            tr("ΔH° = {dH} kJ/mol is **negative**, so adsorption is "
+            "**exothermic**: heat is released on binding, and uptake falls as "
+            "temperature rises. Practically, this means running the process cold "
+            "gives higher capacity, and it makes thermal regeneration of the "
+            "adsorbent straightforward.",
+                dH=fmt(dH))
         )
     amag = abs(dH)
     if amag < 20:
         out.append(
-            f"|ΔH°| = {fmt(amag)} kJ/mol is below ~20 kJ/mol, consistent with "
-            f"**physisorption** (the enthalpy of physical adsorption is typically "
-            f"2–40 kJ/mol, similar to a condensation enthalpy)."
+            tr("|ΔH°| = {amag} kJ/mol is below ~20 kJ/mol, consistent with "
+            "**physisorption** (the enthalpy of physical adsorption is typically "
+            "2–40 kJ/mol, similar to a condensation enthalpy).",
+                amag=fmt(amag))
         )
     elif amag < 40:
         out.append(
-            f"|ΔH°| = {fmt(amag)} kJ/mol sits in the 20–40 kJ/mol transition zone, "
-            f"where physical and chemical contributions are both plausible. Do not "
-            f"claim a mechanism from this number alone, support it with the D–R "
-            f"mean free energy E, spectroscopic evidence, or a reversibility test."
+            tr("|ΔH°| = {amag} kJ/mol sits in the 20–40 kJ/mol transition zone, "
+            "where physical and chemical contributions are both plausible. Do not "
+            "claim a mechanism from this number alone, support it with the D–R "
+            "mean free energy E, spectroscopic evidence, or a reversibility test.",
+                amag=fmt(amag))
         )
     else:
         out.append(
-            f"|ΔH°| = {fmt(amag)} kJ/mol exceeds 40 kJ/mol, which points to "
-            f"**chemisorption**: bond formation rather than physical attraction. "
-            f"Expect the process to be slow to reverse and the adsorbent hard to "
-            f"regenerate without harsh conditions."
+            tr("|ΔH°| = {amag} kJ/mol exceeds 40 kJ/mol, which points to "
+            "**chemisorption**: bond formation rather than physical attraction. "
+            "Expect the process to be slow to reverse and the adsorbent hard to "
+            "regenerate without harsh conditions.",
+                amag=fmt(amag))
         )
 
     # dS
     if dS > 0:
         out.append(
-            f"ΔS° = {fmt(dS)} J mol⁻¹ K⁻¹ is **positive**, indicating increased "
-            f"randomness at the solid–liquid interface. This is the usual result in "
-            f"aqueous systems and is counter-intuitive at first, because fixing a "
-            f"molecule onto a surface should *lower* entropy. The resolution is "
-            f"that the adsorbate and the surface are both hydrated: binding "
-            f"releases several ordered water molecules per adsorbate molecule into "
-            f"the bulk, and that gain outweighs the entropy lost by the adsorbate "
-            f"itself. A positive ΔS° is therefore evidence of a desolvation-driven "
-            f"process."
+            tr("ΔS° = {dS} J mol⁻¹ K⁻¹ is **positive**, indicating increased "
+            "randomness at the solid–liquid interface. This is the usual result in "
+            "aqueous systems and is counter-intuitive at first, because fixing a "
+            "molecule onto a surface should *lower* entropy. The resolution is "
+            "that the adsorbate and the surface are both hydrated: binding "
+            "releases several ordered water molecules per adsorbate molecule into "
+            "the bulk, and that gain outweighs the entropy lost by the adsorbate "
+            "itself. A positive ΔS° is therefore evidence of a desolvation-driven "
+            "process.",
+                dS=fmt(dS))
         )
     else:
         out.append(
-            f"ΔS° = {fmt(dS)} J mol⁻¹ K⁻¹ is **negative**, indicating decreased "
-            f"randomness at the interface: the adsorbate loses translational and "
-            f"rotational freedom on binding, and that loss is not offset by "
-            f"released solvation water. This is typical of adsorption onto a "
-            f"well-ordered surface, or of large molecules that adopt a fixed "
-            f"orientation on binding."
+            tr("ΔS° = {dS} J mol⁻¹ K⁻¹ is **negative**, indicating decreased "
+            "randomness at the interface: the adsorbate loses translational and "
+            "rotational freedom on binding, and that loss is not offset by "
+            "released solvation water. This is typical of adsorption onto a "
+            "well-ordered surface, or of large molecules that adopt a fixed "
+            "orientation on binding.",
+                dS=fmt(dS))
         )
 
     # driving force decomposition at the middle temperature
@@ -418,21 +441,23 @@ def interpret_thermo(res: dict, route_info: dict | None = None) -> list[str]:
     entr = -Tm * dS / 1000.0
     if abs(enth) > abs(entr):
         out.append(
-            f"Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
-            f"contributes {fmt(enth)} kJ/mol and the entropy term (−TΔS°) "
-            f"contributes {fmt(entr)} kJ/mol. The process is **enthalpy-driven**"
-            f"the strength of the adsorbate–surface interaction, not the entropy "
-            f"gain, is what makes it favourable."
+            tr("Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
+            "contributes {enth} kJ/mol and the entropy term (−TΔS°) "
+            "contributes {entr} kJ/mol. The process is **enthalpy-driven**, so "
+            "the strength of the adsorbate–surface interaction, not the entropy "
+            "gain, is what makes it favourable.",
+                Tm=Tm, enth=fmt(enth), entr=fmt(entr))
         )
     else:
         out.append(
-            f"Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
-            f"contributes {fmt(enth)} kJ/mol and the entropy term (−TΔS°) "
-            f"contributes {fmt(entr)} kJ/mol. The process is **entropy-driven**"
-            f"it proceeds because of the disorder gained (largely released "
-            f"solvation water), not because binding is energetically strong. This "
-            f"is the common situation for endothermic adsorption, where a positive "
-            f"ΔH° is overcome by a larger positive ΔS°."
+            tr("Decomposing the driving force at {Tm:.0f} K: the enthalpy term "
+            "contributes {enth} kJ/mol and the entropy term (−TΔS°) "
+            "contributes {entr} kJ/mol. The process is **entropy-driven**, so "
+            "it proceeds because of the disorder gained (largely released "
+            "solvation water), not because binding is energetically strong. This "
+            "is the common situation for endothermic adsorption, where a positive "
+            "ΔH° is overcome by a larger positive ΔS°.",
+                Tm=Tm, enth=fmt(enth), entr=fmt(entr))
         )
 
     out.extend(res.get("warnings", []))
@@ -484,29 +509,29 @@ def isosteric_heat(T_list, Ce_at_q, q_values) -> dict:
         hs = np.array([r["dH_iso_kJ_mol"] for r in valid])
         sl = sps.linregress(qs, hs).slope
         if abs(sl) < 1e-3 * max(1.0, float(np.mean(np.abs(hs)))):
-            trend = ("The isosteric heat is essentially constant with loading, "
+            trend = tr("The isosteric heat is essentially constant with loading, "
                      "which is the signature of an energetically **homogeneous** "
                      "surface: every site binds with the same enthalpy. This is "
                      "the assumption Langmuir makes, so a constant ΔH_iso supports "
                      "a Langmuir description.")
         elif sl > 0:
-            trend = ("|ΔH_iso| decreases as loading increases (the values become "
+            trend = tr("|ΔH_iso| decreases as loading increases (the values become "
                      "less negative). This is the classic **heterogeneous surface** "
                      "result: the highest-energy sites are occupied first, so each "
                      "additional molecule binds more weakly than the last. It "
                      "supports Freundlich, Sips or Tóth over Langmuir.")
         else:
-            trend = ("|ΔH_iso| increases with loading, meaning later molecules bind "
+            trend = tr("|ΔH_iso| increases with loading, meaning later molecules bind "
                      "*more* strongly than earlier ones. That indicates "
                      "**cooperative adsorption**: adsorbed molecules attract "
                      "further adsorbate, as in surface aggregation or hemimicelle "
                      "formation. Cross-check it against a Hill coefficient above 1.")
 
     return {"rows": rows, "trend": trend,
-            "note": "ΔH_iso is obtained at constant loading, so unlike the van't "
+            "note": tr("ΔH_iso is obtained at constant loading, so unlike the van't "
                     "Hoff ΔH° it resolves how the binding enthalpy changes as the "
                     "surface fills. Its variation with coverage is direct evidence "
-                    "about surface heterogeneity."}
+                    "about surface heterogeneity.")}
 
 
 # --------------------------------------------------------------------------
@@ -529,22 +554,25 @@ def arrhenius(T_list, k_list) -> dict:
     A = float(np.exp(lr.intercept))
 
     if Ea < 0:
-        note = (f"E_a = {fmt(Ea)} kJ/mol is negative, meaning the rate *decreases* "
-                f"with temperature. For a single elementary step this is "
-                f"impossible; it usually means the apparent rate constant lumps "
-                f"together an exothermic pre-equilibrium with the rate-determining "
-                f"step, or that the kinetic model does not describe the data at "
-                f"every temperature.")
+        note = (tr("E_a = {Ea} kJ/mol is negative, meaning the rate *decreases* "
+                "with temperature. For a single elementary step this is "
+                "impossible; it usually means the apparent rate constant lumps "
+                "together an exothermic pre-equilibrium with the rate-determining "
+                "step, or that the kinetic model does not describe the data at "
+                "every temperature.",
+            Ea=fmt(Ea)))
     elif Ea < 40:
-        note = (f"E_a = {fmt(Ea)} kJ/mol is below about 40 kJ/mol, which indicates a "
-                f"**diffusion-controlled, physical** process. Physisorption has a "
-                f"low energy barrier, so the rate is limited by how fast adsorbate "
-                f"reaches the surface rather than by the binding event itself.")
+        note = (tr("E_a = {Ea} kJ/mol is below about 40 kJ/mol, which indicates a "
+                "**diffusion-controlled, physical** process. Physisorption has a "
+                "low energy barrier, so the rate is limited by how fast adsorbate "
+                "reaches the surface rather than by the binding event itself.",
+            Ea=fmt(Ea)))
     else:
-        note = (f"E_a = {fmt(Ea)} kJ/mol exceeds 40 kJ/mol, the conventional "
-                f"threshold for a **chemically controlled** process. The rate is "
-                f"limited by bond formation at the surface, which is consistent "
-                f"with chemisorption.")
+        note = (tr("E_a = {Ea} kJ/mol exceeds 40 kJ/mol, the conventional "
+                "threshold for a **chemically controlled** process. The rate is "
+                "limited by bond formation at the surface, which is consistent "
+                "with chemisorption.",
+            Ea=fmt(Ea)))
 
     return {"Ea_kJ_mol": Ea, "A": A, "R2": lr.rvalue ** 2,
             "se_kJ_mol": R_GAS * lr.stderr / 1000.0 if np.isfinite(lr.stderr) else np.nan,
@@ -570,17 +598,20 @@ def sticking_probability(T_list, theta_list) -> dict:
     S = float(np.exp(lr.intercept))
 
     if 0 < S < 1:
-        note = (f"S* = {fmt(S)} lies between 0 and 1, the range in which the "
-                f"sticking-probability model is valid. It is read as the fraction "
-                f"of molecular collisions with the surface that result in "
-                f"adsorption: here about {S * 100:.1f}% of encounters stick.")
+        note = (tr("S* = {S} lies between 0 and 1, the range in which the "
+                "sticking-probability model is valid. It is read as the fraction "
+                "of molecular collisions with the surface that result in "
+                "adsorption: here about {v1:.1f}% of encounters stick.",
+            S=fmt(S), v1=S * 100))
     elif S > 1:
-        note = (f"S* = {fmt(S)} exceeds 1, which is outside the model's valid range "
-                f"(a probability cannot exceed unity). The usual cause is that "
-                f"coverage θ was computed at a concentration where the surface is "
-                f"far from saturated. Treat this result as uninterpretable.")
+        note = (tr("S* = {S} exceeds 1, which is outside the model's valid range "
+                "(a probability cannot exceed unity). The usual cause is that "
+                "coverage θ was computed at a concentration where the surface is "
+                "far from saturated. Treat this result as uninterpretable.",
+            S=fmt(S)))
     else:
-        note = f"S* = {fmt(S)} is not positive, so the model does not apply here."
+        note = tr("S* = {S} is not positive, so the model does not apply here.",
+            S=fmt(S))
 
     return {"S_star": S, "Ea_kJ_mol": Ea, "R2": lr.rvalue ** 2,
             "interpretation": note,

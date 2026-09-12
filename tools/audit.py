@@ -276,6 +276,47 @@ def check_accessibility():
 
 
 # --------------------------------------------------------------------------
+def check_python_i18n():
+    """Is the prose the Python layer writes actually translated?"""
+    sys.path.insert(0, "tools")
+    sys.path.insert(0, "py")
+    try:
+        import i18n_py
+        from ko import KO
+    except Exception as exc:
+        add("ERROR", "i18n-py", "could not load the translation tables: %s" % exc)
+        return
+
+    tpl = i18n_py.templates()
+    # A model named after a person keeps that name in Korean, so an absent
+    # translation there is the intended outcome rather than a gap.
+    prose = {t: m for t, m in tpl.items() if m != {"model names"}}
+    names = {t for t, m in tpl.items() if m == {"model names"}}
+    done = [t for t in prose if t in KO]
+    todo = [t for t in prose if t not in KO]
+    orphan = [k for k in KO if k not in tpl]
+    add("INFO", "i18n-py", "%d of %d model names translated, the rest are "
+        "eponyms kept as they are" % (len({n for n in names if n in KO}),
+                                      len(names)))
+
+    # a translation whose placeholders differ would fall back mid-sentence
+    bad = [t for t in done
+           if i18n_py.holders(t) != i18n_py.holders(KO[t])]
+    for t in bad:
+        add("ERROR", "i18n-py",
+            "Korean placeholders differ from the English: %s" % t[:60])
+    for k in orphan:
+        add("WARN", "i18n-py",
+            "Korean entry with no matching English sentence: %s" % k[:60])
+    if todo:
+        add("WARN", "i18n-py",
+            "%d of %d generated sentences are still English only"
+            % (len(todo), len(tpl)))
+    if not bad and not orphan and not todo:
+        add("OK", "i18n-py",
+            "all %d generated sentences are translated" % len(tpl))
+
+
 def check_seo():
     """Can a search engine see what this site is, without running Pyodide?"""
     html = read("index.html")
@@ -328,7 +369,8 @@ if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     for fn in (check_i18n, check_models, check_presets, check_assets,
                check_cache_busting, check_hygiene, check_external,
-               check_notation, check_licence, check_accessibility, check_seo):
+               check_notation, check_licence, check_accessibility, check_seo,
+               check_python_i18n):
         try:
             fn()
         except Exception as exc:

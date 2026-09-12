@@ -30,6 +30,7 @@ from core import (fit_model, rank_models, check_domain, fmt,
                   terminal_slope_ratio)
 from isotherms import ISOTHERM_MODELS
 from kinetics import KINETIC_MODELS
+from lang import tr
 
 
 # --------------------------------------------------------------------------
@@ -173,7 +174,7 @@ def advise(category: str, x, y, ctx: dict | None = None,
         spec = registry[key]
         row = rows[key]
         if row.get("verdict") == "avoid":
-            out.append({"key": key, "name": spec.name, "family": spec.family,
+            out.append({"key": key, "name": tr(spec.name), "family": spec.family,
                         "n_params": spec.n_params, "verdict": "avoid",
                         "reasons": row["reasons"], "R2": None, "delta": None,
                         "rank": None})
@@ -187,7 +188,8 @@ def advise(category: str, x, y, ctx: dict | None = None,
 
         reasons, verdict = [], "usable"
         if not f.success:
-            verdict, reasons = "avoid", ["The fit did not converge on these data."]
+            verdict, reasons = "avoid", [
+                tr("The fit did not converge on these data.")]
         elif blocking:
             verdict = "avoid"
             reasons = [i["text"] for i in blocking]
@@ -200,40 +202,43 @@ def advise(category: str, x, y, ctx: dict | None = None,
             # "this model is wrong", and saying otherwise would be misleading.
             if r2 is not None and np.isfinite(r2) and r2 < 0.90:
                 verdict = "avoid"
-                reasons.append(
-                    f"It reproduces only {max(0.0, r2) * 100:.0f}% of the variance "
-                    f"in your data (R² = {fmt(r2)}), so it is not describing this "
-                    f"system.")
+                reasons.append(tr(
+                    "It reproduces only {pct:.0f}% of the variance in your "
+                    "data (R² = {r2}), so it is not describing this system.",
+                    pct=max(0.0, r2) * 100, r2=fmt(r2)))
             elif delta < 2:
                 simpler = _simplest_within(rows, ranking, registry, 2.0)
                 if simpler and spec.n_params > simpler[1]:
                     verdict = "usable"
-                    reasons.append(
-                        f"Fits as well as anything here (R² = {fmt(r2)}), but "
-                        f"{simpler[0]} matches it with only {simpler[1]} parameters "
-                        f"instead of {spec.n_params}. The extra parameters are not "
-                        f"earning their place; prefer the simpler model unless you "
-                        f"need this one's specific physical meaning.")
+                    reasons.append(tr(
+                        "Fits as well as anything here (R² = {r2}), but {other} "
+                        "matches it with only {np_other} parameters instead of "
+                        "{np_this}. The extra parameters are not earning their "
+                        "place, so prefer the simpler model unless you need "
+                        "this one's specific physical meaning.",
+                        r2=fmt(r2), other=simpler[0], np_other=simpler[1],
+                        np_this=spec.n_params))
                 else:
                     verdict = "recommend"
-                    reasons.append(
-                        f"Best-supported model for these data and the most "
-                        f"parsimonious of the equally good ones "
-                        f"(ΔAICc = {fmt(delta)}, R² = {fmt(r2)}, "
-                        f"{spec.n_params} parameters).")
+                    reasons.append(tr(
+                        "Best-supported model for these data, and the most "
+                        "parsimonious of the equally good ones (ΔAICc = "
+                        "{delta}, R² = {r2}, {np} parameters).",
+                        delta=fmt(delta), r2=fmt(r2), np=spec.n_params))
             elif delta < 10:
                 verdict = "usable"
-                reasons.append(
-                    f"Describes the data well (R² = {fmt(r2)}) but is "
-                    f"ΔAICc = {fmt(delta)} behind the leading model; it costs "
-                    f"accuracy or parameters without a compensating gain.")
+                reasons.append(tr(
+                    "Describes the data well (R² = {r2}) but is ΔAICc = "
+                    "{delta} behind the leading model, so it costs accuracy "
+                    "or parameters without a compensating gain.",
+                    r2=fmt(r2), delta=fmt(delta)))
             else:
                 verdict = "usable"
-                reasons.append(
-                    f"Still reproduces the data (R² = {fmt(r2)}), but at "
-                    f"ΔAICc = {fmt(delta)} the evidence clearly favours another "
-                    f"model. Report it only if its physical interpretation is what "
-                    f"you specifically need.")
+                reasons.append(tr(
+                    "Still reproduces the data (R² = {r2}), but at ΔAICc = "
+                    "{delta} the evidence clearly favours another model. "
+                    "Report it only if its physical interpretation is what "
+                    "you specifically need.", r2=fmt(r2), delta=fmt(delta)))
 
         # physics-driven reasons layered on top of the statistics
         reasons.extend(_physics_notes(category, key, spec, shape, ctx))
@@ -244,7 +249,7 @@ def advise(category: str, x, y, ctx: dict | None = None,
                 verdict = "usable"
 
         out.append({
-            "key": key, "name": spec.name, "family": spec.family,
+            "key": key, "name": tr(spec.name), "family": spec.family,
             "n_params": spec.n_params, "verdict": verdict, "reasons": reasons,
             "R2": f.stats.get("R2") if f.success else None,
             "delta": rank["delta"] if rank else None,
@@ -292,79 +297,83 @@ def _physics_notes(category, key, spec, s, ctx) -> list[str]:
                              "marczewski_jaroniec", "koble_corrigan",
                              "elovich_isotherm", "baudu", "vieth_sladek")
         if saturating and s["still_rising"]:
-            r.append("This model's capacity parameter is a saturation plateau, "
+            r.append(tr("This model's capacity parameter is a saturation plateau, "
                      "and your data have not reached one, so q_max will be an "
-                     "extrapolation well beyond the measured range.")
+                     "extrapolation well beyond the measured range."))
         if saturating and s["plateaus"]:
-            r.append("Your data reach a clear plateau, which is exactly what this "
-                     "model's saturation capacity is meant to describe.")
+            r.append(tr("Your data reach a clear plateau, which is exactly what this "
+                     "model's saturation capacity is meant to describe."))
         if key == "freundlich":
             if s["plateaus"]:
-                r.append("Freundlich has no plateau: it rises without limit: so "
+                r.append(tr("Freundlich has no plateau: it rises without limit: so "
                          "it cannot reproduce the flat region your data show, and "
-                         "K_F must not be quoted as a capacity.")
+                         "K_F must not be quoted as a capacity."))
             else:
-                r.append("Freundlich suits data that are still rising, as yours "
-                         "are, because it makes no saturation assumption.")
+                r.append(tr("Freundlich suits data that are still rising, as yours "
+                         "are, because it makes no saturation assumption."))
         if key == "temkin":
-            r.append("Temkin is a mid-coverage model with no plateau and a "
+            r.append(tr("Temkin is a mid-coverage model with no plateau and a "
                      "logarithmic divergence at low C_e; it is best kept for the "
-                     "middle of a concentration series.")
+                     "middle of a concentration series."))
         if key == "hill" and s.get("sigmoidal"):
-            r.append("Your isotherm looks sigmoidal, and Hill is one of the few "
+            r.append(tr("Your isotherm looks sigmoidal, and Hill is one of the few "
                      "models here that can produce an S-shape; that is a genuine "
-                     "reason to prefer it over Langmuir.")
+                     "reason to prefer it over Langmuir."))
         if key in ("langmuir", "sips", "toth") and s.get("sigmoidal"):
-            r.append("Your isotherm appears sigmoidal. This model is strictly "
-                     "concave and cannot reproduce an inflection point.")
+            r.append(tr("Your isotherm appears sigmoidal. This model is strictly "
+                     "concave and cannot reproduce an inflection point."))
         if s["is_linear"] and key in ("langmuir", "sips", "toth", "hill"):
-            r.append(f"Your data are close to a straight line through the origin "
-                     f"(R² = {fmt(s['linear_R2'])}). In the Henry's-law regime "
-                     f"the affinity and capacity parameters become strongly "
-                     f"correlated and neither is well determined.")
+            r.append(tr(
+                "Your data are close to a straight line through the origin "
+                "(R² = {r2}). In the Henry's-law regime the affinity and "
+                "capacity parameters become strongly correlated and neither "
+                "is well determined.", r2=fmt(s["linear_R2"])))
         if spec.n_params >= 4 and s["n"] < 8:
-            r.append(f"{spec.n_params} parameters against {s['n']} data points "
-                     f"leaves very little to constrain them; this model will fit "
-                     f"almost anything at this sample size.")
+            r.append(tr(
+                "{np} parameters against {n} data points leaves very little "
+                "to constrain them, so this model will fit almost anything at "
+                "this sample size.", np=spec.n_params, n=s["n"]))
         if key in ("sips", "toth", "redlich_peterson", "marczewski_jaroniec") \
                 and np.isfinite(s.get("slope_drift", np.nan)) \
                 and abs(s["slope_drift"]) > 0.15:
-            r.append("The log–log slope changes noticeably from the dilute to the "
+            r.append(tr("The log–log slope changes noticeably from the dilute to the "
                      "concentrated end of your data, which is the signature of a "
                      "heterogeneous surface: the situation this model's extra "
-                     "exponent exists to capture.")
+                     "exponent exists to capture."))
     else:
         needs_eq = key in ("pfo", "pso", "avrami", "mixed_1_2", "nth_order",
                            "ritchie", "fractal_pfo", "film_diffusion",
                            "double_exponential", "crank")
         if needs_eq and s["still_rising"]:
-            r.append("This model fits an equilibrium capacity, and your run has "
+            r.append(tr("This model fits an equilibrium capacity, and your run has "
                      "not equilibrated: q_e and the rate constant will trade off "
-                     "against each other.")
+                     "against each other."))
         if needs_eq and s["equilibrated"]:
-            r.append("Your run reaches a clear plateau, so q_e is well defined.")
+            r.append(tr("Your run reaches a clear plateau, so q_e is well defined."))
         if not s["well_sampled_early"]:
-            r.append(f"Only {s['n_early']} point(s) before half the uptake was "
-                     f"reached: rate constants are determined by that region.")
+            r.append(tr(
+                "Only {k} point(s) before half the uptake was reached, and "
+                "rate constants are determined by that region.",
+                k=s["n_early"]))
         if key == "elovich" and s["equilibrated"]:
-            r.append("Elovich rises logarithmically without limit, so it cannot "
-                     "match the plateau in your data.")
+            r.append(tr("Elovich rises logarithmically without limit, so it cannot "
+                     "match the plateau in your data."))
         if key == "double_exponential":
             if s.get("two_stage"):
-                r.append("Your curve shows a distinct break between a fast and a "
+                r.append(tr("Your curve shows a distinct break between a fast and a "
                          "slow stage, which is the specific case this model exists "
-                         "for.")
+                         "for."))
             else:
-                r.append("Your curve shows no clear two-stage break, so the second "
-                         "exponential has little to explain.")
+                r.append(tr("Your curve shows no clear two-stage break, so the second "
+                         "exponential has little to explain."))
         if key in ("weber_morris",) and s.get("two_stage"):
-            r.append("A break in the q vs √t slope is visible in your data, the "
+            r.append(tr("A break in the q vs √t slope is visible in your data, the "
                      "multi-region analysis on the Diffusion tab is the right tool "
-                     "for it.")
+                     "for it."))
         if not s["monotonic"]:
-            r.append("Your uptake curve is not monotonic. Every kinetic model here "
+            r.append(tr("Your uptake curve is not monotonic. Every kinetic model here "
                      "assumes uptake only increases, so check those points before "
-                     "modelling.")
+                     "modelling."))
     return r
 
 
@@ -372,76 +381,85 @@ def _shape_summary(category, s, ctx) -> list[str]:
     """A short plain-language reading of what the raw data look like."""
     out = []
     if category == "isotherm":
-        out.append(
-            f"You have {s['n']} equilibrium points spanning C_e = {fmt(s['x_min'])} "
-            f"to {fmt(s['x_max'])} "
-            + (f"({s['decades']:.1f} decades)" if np.isfinite(s["decades"]) else "")
-            + f", with q_e from {fmt(s['y_min'])} to {fmt(s['y_max'])}.")
+        span = (tr("({d:.1f} decades)", d=s["decades"])
+                if np.isfinite(s["decades"]) else "")
+        out.append(tr(
+            "You have {n} equilibrium points spanning C_e = {xlo} to {xhi} "
+            "{span}, with q_e from {ylo} to {yhi}.",
+            n=s["n"], xlo=fmt(s["x_min"]), xhi=fmt(s["x_max"]), span=span,
+            ylo=fmt(s["y_min"]), yhi=fmt(s["y_max"])))
         if s["plateaus"]:
-            out.append("The isotherm **reaches a plateau**, the top third of the "
+            out.append(tr("The isotherm **reaches a plateau**, the top third of the "
                        "concentration range adds little further uptake. Saturation "
                        "models (Langmuir, Sips, Tóth) can therefore give a capacity "
-                       "that is measured rather than extrapolated.")
+                       "that is measured rather than extrapolated."))
         elif s["still_rising"]:
-            out.append("The isotherm is **still rising steeply** at your highest "
+            out.append(tr("The isotherm is **still rising steeply** at your highest "
                        "concentration. Nothing here determines a saturation "
                        "capacity, so treat any q_max as an extrapolation and prefer "
-                       "models that do not assume a plateau.")
+                       "models that do not assume a plateau."))
         else:
-            out.append("The isotherm is beginning to level off but has not fully "
+            out.append(tr("The isotherm is beginning to level off but has not fully "
                        "plateaued, so a fitted capacity is only moderately "
-                       "constrained.")
+                       "constrained."))
         if np.isfinite(s.get("loglog_slope", np.nan)):
             sl = s["loglog_slope"]
-            out.append(
-                f"The overall log–log slope is {fmt(sl)}, i.e. a Freundlich 1/n of "
-                f"about {fmt(sl)}. "
-                + ("Well below 1, so adsorption is strongly favourable and the "
-                   "surface is energetically heterogeneous."
-                   if sl < 0.5 else
-                   "Close to 1, so uptake is nearly proportional to concentration; "
-                   "you may be in the linear Henry's-law regime, where most "
-                   "isotherm models become hard to distinguish."
-                   if sl > 0.85 else
-                   "Between 0.5 and 1, the usual favourable range."))
+            if sl < 0.5:
+                verdict = tr("Well below 1, so adsorption is strongly "
+                             "favourable and the surface is energetically "
+                             "heterogeneous.")
+            elif sl > 0.85:
+                verdict = tr("Close to 1, so uptake is nearly proportional to "
+                             "concentration. You may be in the linear "
+                             "Henry's-law regime, where most isotherm models "
+                             "become hard to distinguish.")
+            else:
+                verdict = tr("Between 0.5 and 1, the usual favourable range.")
+            out.append(tr(
+                "The overall log–log slope is {sl}, so the Freundlich 1/n is "
+                "about {sl}. {verdict}", sl=fmt(sl), verdict=verdict))
         if s["is_linear"]:
-            out.append("**Caution:** your data are nearly a straight line through "
+            out.append(tr("**Caution:** your data are nearly a straight line through "
                        "the origin. In this regime almost every isotherm model will "
                        "fit well and they cannot be told apart; extend the "
-                       "concentration range before claiming a mechanism.")
+                       "concentration range before claiming a mechanism."))
         if s.get("sigmoidal"):
-            out.append("The curve appears **sigmoidal** (uptake accelerates before "
+            out.append(tr("The curve appears **sigmoidal** (uptake accelerates before "
                        "it saturates). Langmuir, Freundlich and Tóth are all "
-                       "strictly concave and cannot reproduce that; Hill and BET can.")
+                       "strictly concave and cannot reproduce that; Hill and BET can."))
     else:
-        out.append(
-            f"You have {s['n']} time points from {fmt(s['t_min'])} to "
-            f"{fmt(s['t_max'])}, reaching q = {fmt(s['q_max'])}.")
+        out.append(tr(
+            "You have {n} time points from {tlo} to {thi}, reaching q = {q}.",
+            n=s["n"], tlo=fmt(s["t_min"]), thi=fmt(s["t_max"]),
+            q=fmt(s["q_max"])))
         if s["equilibrated"]:
-            out.append("The run **reaches equilibrium**; uptake is flat over the "
+            out.append(tr("The run **reaches equilibrium**; uptake is flat over the "
                        "final third: so q_e is directly measured and the models "
-                       "that fit it are on solid ground.")
+                       "that fit it are on solid ground."))
         elif s["still_rising"]:
-            out.append("Uptake is **still climbing** at your last time point. Every "
+            out.append(tr("Uptake is **still climbing** at your last time point. Every "
                        "model that fits q_e will be extrapolating, and because q_e "
                        "and the rate constant are correlated, both become "
-                       "unreliable. Extend the contact time.")
-        out.append(
-            f"{s['n_early']} point(s) fall below half the final uptake. "
-            + ("That is enough to define the early, fast stage that fixes the rate "
-               "constant." if s["well_sampled_early"] else
-               "**That is too few**: rate constants are determined almost entirely "
-               "by the early stage, so sample more densely at short times."))
+                       "unreliable. Extend the contact time."))
+        enough = (tr("That is enough to define the early, fast stage that "
+                     "fixes the rate constant.")
+                  if s["well_sampled_early"] else
+                  tr("**That is too few.** Rate constants are determined "
+                     "almost entirely by the early stage, so sample more "
+                     "densely at short times."))
+        out.append(tr(
+            "{k} point(s) fall below half the final uptake. {enough}",
+            k=s["n_early"], enough=enough))
         if s.get("two_stage"):
-            out.append(
-                f"The uptake rate against √t drops by a factor of "
-                f"{fmt(s.get('slope_ratio'))} partway through, which indicates "
-                f"**two distinct stages**: typically fast external-surface "
-                f"adsorption followed by slower intraparticle diffusion. The "
-                f"Weber–Morris multi-region analysis and the double-exponential "
-                f"model are both worth running.")
+            out.append(tr(
+                "The uptake rate against √t drops by a factor of {ratio} "
+                "partway through, which indicates **two distinct stages**: "
+                "typically fast external-surface adsorption followed by slower "
+                "intraparticle diffusion. The Weber–Morris multi-region "
+                "analysis and the double-exponential model are both worth "
+                "running.", ratio=fmt(s.get("slope_ratio"))))
         if not s["monotonic"]:
-            out.append("**Your uptake curve decreases somewhere.** That breaks the "
+            out.append(tr("**Your uptake curve decreases somewhere.** That breaks the "
                        "core assumption of every kinetic model here; check those "
-                       "points for desorption or measurement error first.")
+                       "points for desorption or measurement error first."))
     return out
