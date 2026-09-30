@@ -197,3 +197,36 @@ KO_CORE = {
         "그래프가 선형 구간 {v3}개로 나뉘며, 이는 예상되는 다단계 거동입니다. "
         "구간 1의 k_id는 {v2}, 구간 2의 k_id는 {v1} mg g⁻¹ min⁻⁰·⁵입니다. ",
 }
+
+# Diffusion tab: the Boyd verdict and the Weber-Morris two-stage reading.
+# These were written as branches of a conditional joined with +, so they were
+# invisible to both the wrapper and the coverage report until they were
+# wrapped in tr() individually.
+KO_CORE.update({
+    "The intercept is not statistically distinguishable from zero, so the "
+    "line passes through the origin: **intraparticle (pore) diffusion** "
+    "controls the rate.":
+        "절편이 통계적으로 0과 구별되지 않으므로 직선이 원점을 지납니다. "
+        "**입자 내(세공) 확산**이 속도를 지배합니다.",
+
+    "The intercept differs significantly from zero, so the line does NOT pass "
+    "through the origin: **film diffusion** (transport across the liquid "
+    "boundary layer around the particle), or a chemical reaction step, "
+    "controls the rate rather than intraparticle diffusion.":
+        "절편이 0과 유의하게 다르므로 직선이 원점을 지나지 **않습니다**. 입자 내 "
+        "확산이 아니라 **막 확산**(입자를 둘러싼 액체 경계층을 가로지르는 물질 "
+        "전달)이나 화학반응 단계가 속도를 지배합니다.",
+
+    "The first stage is faster, as expected: adsorbate first covers the "
+    "readily accessible external surface, then diffusion into the pores takes "
+    "over and slows the process.":
+        "예상대로 첫 단계가 더 빠릅니다. 흡착질이 먼저 접근하기 쉬운 외부 표면을 "
+        "덮고, 이어서 세공 내부로의 확산이 지배하면서 과정이 느려집니다.",
+
+    "Unusually, the second stage is faster than the first. Check the "
+    "segmentation: this can happen when the first region contains too few "
+    "points to define a slope.":
+        "드물게도 두 번째 단계가 첫 단계보다 빠릅니다. 구간 분할을 확인하세요. "
+        "첫 구간의 점이 너무 적어 기울기를 정의하지 못할 때 이런 일이 "
+        "생깁니다.",
+})

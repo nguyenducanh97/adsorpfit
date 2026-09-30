@@ -1677,7 +1677,8 @@
     wrap.appendChild(el("div", { class: "table-wrap" }, [
       el("table", { class: "data" }, [
         el("thead", {}, [el("tr", {}, [
-          el("th", { text: "Stage" }), el("th", { text: "Interpretation" }),
+          el("th", { text: I18N.t("th.stage") }),
+          el("th", { text: I18N.t("th.interpretation") }),
           el("th", { class: "num", text: "k_id" }), el("th", { class: "num", text: "C" }),
           el("th", { class: "num", text: "R²" }), el("th", { class: "num", text: "n" })
         ])]),
@@ -1705,6 +1706,19 @@
       ]));
       wrap.appendChild(el("div", { id: "boyd-plot" }));
     }
+
+    // The download belongs on this tab, next to the numbers it saves. Sending
+    // the reader to the export tab for it was the reason it looked missing.
+    wrap.appendChild(el("div", { class: "section-title",
+      text: I18N.t("sec.diffusionDownload") }));
+    wrap.appendChild(el("p", { class: "tiny", style: "margin:0 0 8px",
+      text: I18N.t("help.diffusionDownload") }));
+    wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom:18px" }, [
+      el("button", { class: "btn sm", onclick: function () { exportDiffusion("csv"); } },
+        [I18N.t("btn.downloadCsv")]),
+      el("button", { class: "btn sm", onclick: function () { exportDiffusion("xlsx"); } },
+        [I18N.t("btn.downloadXlsx")])
+    ]));
 
     setTimeout(function () {
       const segTraces = [];
@@ -1918,6 +1932,20 @@
       } }, ["Copy to clipboard"])
     ]));
 
+    // kinetics results carry a diffusion analysis; offer it here too
+    if (cat === "kinetics" && STATE.kinetics.diffusion) {
+      wrap.appendChild(el("div", { class: "section-title",
+        text: I18N.t("sec.weberMorris") }));
+      wrap.appendChild(el("p", { class: "tiny",
+        text: I18N.t("help.diffusionDownload") }));
+      wrap.appendChild(el("div", { class: "btn-row", style: "margin:10px 0 22px" }, [
+        el("button", { class: "btn", onclick: function () { exportDiffusion("csv"); } },
+          [I18N.t("btn.downloadCsv")]),
+        el("button", { class: "btn", onclick: function () { exportDiffusion("xlsx"); } },
+          [I18N.t("btn.downloadXlsx")])
+      ]));
+    }
+
     wrap.appendChild(el("div", { class: "section-title", text: I18N.t("sec.plotData") }));
     wrap.appendChild(el("p", { class: "tiny", html:
       I18N.t("exp.curveNote") }));
@@ -2017,6 +2045,9 @@
         return;
       }
       if (format === "xlsx") {
+        // the diffusion analysis is part of a kinetics result, so it belongs
+        // in the same workbook rather than only behind its own button
+        const extra = cat === "kinetics" ? (diffusionSheets() || []) : [];
         const r = call("export_xlsx", {
           sheets: [
             { name: "Parameters",
@@ -2036,7 +2067,7 @@
               rows: STATE[cat].data.x.map(function (v, i) {
                 return [v, STATE[cat].data.y[i]];
               }) }
-          ]
+          ].concat(extra)
         });
         download(b64ToBlob(r.data, r.mime), "adsorpfit-" + cat + ".xlsx");
         toast("Workbook downloaded.", "good");
@@ -2076,6 +2107,101 @@
     });
     download(new Blob([lines.join("\n")], { type: "text/csv" }),
              "adsorpfit-" + cat + "-curves.csv");
+  }
+
+  /* --------------------------------------------------- diffusion export */
+
+  // The Weber-Morris segmentation and the Boyd plot are results in their own
+  // right: the per-stage k_id and C are what gets reported, and the segment
+  // points are what someone needs to redraw the plot elsewhere. None of it
+  // was reachable from the export tab, so it is collected here once and used
+  // by both the button on the diffusion tab and the workbook export.
+  function diffusionSheets() {
+    const d = STATE.kinetics.diffusion;
+    if (!d || !d.weber_morris) return null;
+    const segs = d.weber_morris.segments || [];
+    const sheets = [];
+
+    sheets.push({
+      name: "Weber-Morris",
+      columns: ["Stage", "Interpretation", "k_id (mg/g/min^0.5)",
+                "k_id std. error", "C (mg/g)", "C std. error", "R2", "n points"],
+      rows: segs.map(function (s) {
+        return [s.stage, s.label, s.kid, s.kid_se, s.C, s.C_se, s.R2, s.n_points];
+      })
+    });
+
+    const pts = [];
+    segs.forEach(function (s) {
+      (s.x || []).forEach(function (v, i) {
+        pts.push([s.stage, v, s.y[i], s.kid * v + s.C]);
+      });
+    });
+    sheets.push({
+      name: "Weber-Morris points",
+      columns: ["Stage", "sqrt(t) (min^0.5)", "qt measured (mg/g)",
+                "qt on the segment line (mg/g)"],
+      rows: pts
+    });
+
+    if (d.boyd && d.boyd.t && d.boyd.t.length) {
+      const b = d.boyd;
+      sheets.push({
+        name: "Boyd",
+        columns: ["t (min)", "Bt", "Bt on the fitted line"],
+        rows: b.t.map(function (v, i) {
+          return [v, b.Bt[i], b.slope * v + b.intercept];
+        })
+      });
+      const fit = [["slope B (1/min)", b.slope],
+                   ["intercept", b.intercept],
+                   ["intercept std. error", b.se_intercept],
+                   ["R2", b.R2],
+                   ["passes through the origin", b.through_origin ? "yes" : "no"]];
+      if (b.Di !== undefined && b.Di !== null) {
+        fit.push(["effective diffusion coefficient Di (cm2/min)", b.Di]);
+      }
+      sheets.push({ name: "Boyd fit", columns: ["quantity", "value"], rows: fit });
+    }
+    return sheets;
+  }
+
+  function exportDiffusion(format) {
+    try {
+      const sheets = diffusionSheets();
+      if (!sheets) { toast(I18N.t("msg.noDiffusion"), "bad"); return; }
+
+      if (format === "xlsx") {
+        const r = call("export_xlsx", { sheets: sheets });
+        download(b64ToBlob(r.data, r.mime), "adsorpfit-diffusion.xlsx");
+        toast(I18N.t("msg.workbookSaved"), "good");
+        return;
+      }
+      // One CSV with each table as a commented section, so the stage points
+      // and the fitted constants stay in the same file as the summary.
+      const lines = ["# AdsorpFit diffusion analysis"];
+      sheets.forEach(function (s) {
+        lines.push("");
+        lines.push("# " + s.name);
+        lines.push(s.columns.map(csvCell).join(","));
+        s.rows.forEach(function (row) {
+          lines.push(row.map(csvCell).join(","));
+        });
+      });
+      download(new Blob([lines.join("\n")], { type: "text/csv" }),
+               "adsorpfit-diffusion.csv");
+      toast(I18N.t("msg.downloaded"), "good");
+    } catch (e) {
+      toast("Export failed: " + e.message, "bad", 7000);
+    }
+  }
+
+  // A label such as "stage 2: intraparticle diffusion (rate-limiting)"
+  // contains a comma, which would split the row in two without quoting.
+  function csvCell(v) {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
   function exportReport(cat) {

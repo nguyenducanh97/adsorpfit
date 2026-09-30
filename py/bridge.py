@@ -405,15 +405,16 @@ def diffusion_analysis(payload_json: str) -> str:
                 tr("The Boyd plot has intercept {intercept} ± "
                 "{intercept_stderr} and R² = {v1:.4f}. ",
                     intercept=fmt(lr.intercept), intercept_stderr=fmt(lr.intercept_stderr), v1=lr.rvalue ** 2)
-                + ("The intercept is not statistically distinguishable from zero, "
-                   "so the line passes through the origin: **intraparticle "
-                   "(pore) diffusion** controls the rate."
+                + (tr("The intercept is not statistically distinguishable from "
+                      "zero, so the line passes through the origin: "
+                      "**intraparticle (pore) diffusion** controls the rate.")
                    if not sig else
-                   "The intercept differs significantly from zero, so the line "
-                   "does NOT pass through the origin: **film diffusion** (transport "
-                   "across the liquid boundary layer around the particle), or a "
-                   "chemical reaction step, controls the rate rather than "
-                   "intraparticle diffusion.")
+                   tr("The intercept differs significantly from zero, so the "
+                      "line does NOT pass through the origin: **film "
+                      "diffusion** (transport across the liquid boundary layer "
+                      "around the particle), or a chemical reaction step, "
+                      "controls the rate rather than intraparticle "
+                      "diffusion."))
             )
             if np.isfinite(lr.slope) and lr.slope > 0:
                 r = p.get("particle_radius")
@@ -506,13 +507,13 @@ def _segment_weber_morris(sq, q, n_seg):
             "{v2} and region 2 has k_id = {v1} "
             "mg g⁻¹ min⁻⁰·⁵. ",
                 v3=len(out), v2=fmt(out[0]['kid']), v1=fmt(out[1]['kid']))
-            + ("The first stage is faster, as expected: adsorbate first covers the "
-               "readily accessible external surface, then diffusion into the pores "
-               "takes over and slows the process."
+            + (tr("The first stage is faster, as expected: adsorbate first "
+                  "covers the readily accessible external surface, then "
+                  "diffusion into the pores takes over and slows the process.")
                if slower else
-               "Unusually, the second stage is faster than the first. Check the "
-               "segmentation: this can happen when the first region contains too "
-               "few points to define a slope."))
+               tr("Unusually, the second stage is faster than the first. Check "
+                  "the segmentation: this can happen when the first region "
+                  "contains too few points to define a slope.")))
     else:
         out_note = ("Only one linear region was resolved. If the whole plot really "
                     "is a single straight line through the origin, intraparticle "
