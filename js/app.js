@@ -275,7 +275,15 @@
                      "ko_extra.py", "ko_names.py", "ko_assumptions.py", "ko.py",
                      "core.py", "isotherms.py", "kinetics.py", "thermo.py",
                      "advisor.py", "bridge.py"];
+      // In the built, password-gated copy there is nothing to fetch: the
+      // whole site is one encrypted file, so the Python modules travel
+      // inside it and the build writes them here. Unbundled, they are
+      // fetched as before, which is what keeps local development ordinary.
+      const embedded = window.PY_SOURCES;
       const sources = await Promise.all(files.map(function (f) {
+        if (embedded && typeof embedded[f] === "string") {
+          return Promise.resolve(embedded[f]);
+        }
         return fetch("py/" + f + "?v=" + Date.now()).then(function (r) {
           if (!r.ok) throw new Error("could not load py/" + f + " (" + r.status + ")");
           return r.text();

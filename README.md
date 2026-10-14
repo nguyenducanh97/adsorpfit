@@ -223,16 +223,74 @@ format is one small Python module per study.
 
 ---
 
+## How the site is put together
+
+The published site has two halves, because the tool is behind a password but
+the project should still be findable.
+
+| URL | What it is | Built by |
+| --- | --- | --- |
+| `/` | Public landing page: what the tool does, the full model catalogue, the citations, and all the search metadata | `tools/make_landing.py` |
+| `/app/` | The application itself, as a single AES-256-GCM encrypted file behind an ID and password | `tools/make_gate.py` |
+
+`src/app.html` is the application's page, and it is a **build input rather than
+a page**: its asset paths are written relative to the site root, so opening it
+from `src/` does not run anything. The build inlines both stylesheets, all seven
+scripts and all sixteen Python modules into one document, encrypts it, and
+writes the login page. Nothing the application needs is fetched in the clear
+afterwards, which is the point: a gate that still served `js/app.js` and
+`py/isotherms.py` beside itself would be guarding only the interface.
+
+### What the gate is and is not
+
+    key        = PBKDF2-HMAC-SHA256(id + "\n" + password, salt, 310000)
+    ciphertext = AES-256-GCM(the whole application, key, iv)
+
+There is no stored hash to compare and no branch to skip: a wrong password
+derives a different key, GCM authentication fails, and there is nothing to
+show. That is real encryption rather than a JavaScript `if`.
+
+It is still **not a safe**. The encrypted file is public, so anyone can try
+passwords offline as fast as their hardware allows. The 310,000 iterations make
+each guess expensive, but a short or dictionary password falls anyway. Treat it
+as a lock on the front door.
+
+The password is deliberately **not stored anywhere in this repository**, since a
+public repo would hand it to exactly the people the gate is meant to stop. Pass
+it in when rebuilding:
+
+```bash
+ADSORPFIT_ID=swat ADSORPFIT_PW='...' python tools/make_gate.py
+```
+
+Omit the variables and it prompts instead. `--dev` additionally writes
+`app/dev.html`, the bundle in the clear, for checking that it assembled
+correctly; it is gitignored, and `tools/audit.py` fails if it is ever present
+when the site is published.
+
+---
+
 ## Running it locally
 
-The app fetches its Python modules over HTTP, so opening `index.html` straight
-from disk will not work: the browser blocks it. Serve the folder instead:
+The app loads its Python modules over HTTP, so opening a file straight from disk
+will not work: the browser blocks it. Serve the folder instead:
 
 ```bash
 python -m http.server 8777
 ```
 
-Then open <http://localhost:8777>.
+Then open <http://localhost:8777> for the landing page, or
+<http://localhost:8777/app/> for the tool.
+
+### Rebuilding after a change
+
+```bash
+python tools/make_presets.py                 # examples, from validation/datasets/
+python tools/make_landing.py                 # the public page
+python tools/make_seo.py                     # model catalogue, sitemap, robots
+ADSORPFIT_ID=swat ADSORPFIT_PW='...' python tools/make_gate.py
+python tools/audit.py                        # must end 0 errors, 0 warnings
+```
 
 ---
 
@@ -244,8 +302,8 @@ git branch -M main
 git push -u origin main
 ```
 
-**When you update the site**, bump `APP_VERSION` in `index.html` and the `?v=`
-query on every local `<script>` and `<link>`. Without that, browsers and the
+**When you update the site**, bump `APP_VERSION` in `src/app.html` and the `?v=`
+query on every local `<script>` and `<link>`, then rebuild. Without that, browsers and the
 GitHub Pages CDN keep serving the previously cached JavaScript and CSS, and your
 changes will not appear.
 

@@ -8,7 +8,11 @@ model registry with what the interface claims.
 
 Run from the project root:  python tools/audit.py
 """
-import io, json, os, re, sys
+import base64, io, json, os, re, sys
+
+# The interface lives in the build input now: the root page is the public
+# landing page and the application itself is the encrypted file in app/.
+APP_SRC = os.path.join("src", "app.html")
 
 ISSUES = []          # (severity, area, message)
 
@@ -42,7 +46,7 @@ def check_i18n():
         add("OK", "i18n", "%d keys, both languages complete" % len(blocks["en"]))
 
     # every key referenced in markup or code must exist
-    used = set(re.findall(r'data-i18n="([^"]+)"', read("index.html")))
+    used = set(re.findall(r'data-i18n="([^"]+)"', read(APP_SRC)))
     dynamic = set()
     for f in ("js/app.js", "js/plot.js", "js/layout.js"):
         src_f = read(f)
@@ -151,20 +155,25 @@ def check_assets():
             path = os.path.join(root, f)
             size = os.path.getsize(path)
             total += size
-            if f.endswith((".js", ".css", ".html")) and size > 250 * 1024:
+            if (f.endswith((".js", ".css", ".html")) and size > 250 * 1024
+                    and os.path.basename(root) != "app"):
                 add("WARN", "assets", "%s is %.0f KB" % (path, size / 1024))
     add("OK", "assets", "repository is %.1f MB in total" % (total / 1024 / 1024))
 
-    # anything the page loads must actually exist
-    html = read("index.html")
-    for ref in re.findall(r'(?:src|href)="((?!https?:|data:|#|mailto:|tel:)[^"]+)"', html):
-        path = ref.split("?")[0]
-        if not os.path.exists(path):
-            add("ERROR", "assets", "index.html references a missing file: %s" % path)
+    # anything either page loads must actually exist
+    for page in ("index.html", APP_SRC):
+        html = read(page)
+        for ref in re.findall(r'(?:src|href)="((?!https?:|data:|#|mailto:|tel:)[^"]+)"', html):
+            path = ref.split("?")[0]
+            if path.endswith("/"):
+                continue                      # a directory, such as app/
+            if not os.path.exists(path):
+                add("ERROR", "assets", "%s references a missing file: %s"
+                    % (page, path))
 
 
 def check_cache_busting():
-    html = read("index.html")
+    html = read(APP_SRC)
     ver = re.search(r'window\.APP_VERSION = "([^"]+)"', html)
     if not ver:
         add("ERROR", "release", "APP_VERSION is not set")
@@ -176,6 +185,9 @@ def check_cache_busting():
         add("ERROR", "release",
             "these will be served from cache after an update: %s" %
             ", ".join(unversioned))
+    land = read("index.html")
+    refs += re.findall(r'(?:src|href)="(?:js|css)/[^"?]+\?v=([^"]+)"', land)
+    unversioned += re.findall(r'(?:src|href)="((?:js|css)/[^"?]+)"', land)
     bad = sorted(set(r for r in refs if r != v))
     if bad:
         add("ERROR", "release",
@@ -214,7 +226,7 @@ def check_hygiene():
 
 
 def check_external():
-    html = read("index.html")
+    html = read(APP_SRC) + read("index.html")
     # The canonical link and the og: tags have to be absolute, so the site's
     # own origin appears here. It is not a third party.
     OWN = "nguyenducanh97.github.io"
@@ -261,7 +273,7 @@ def check_licence():
 
 
 def check_accessibility():
-    html = read("index.html")
+    html = read(APP_SRC)
     for m in re.finditer(r"<button(?![^>]*aria-label)([^>]*)>(.*?)</button>",
                          html, re.S):
         inner = re.sub(r"<[^>]+>", "", m.group(2)).strip()
@@ -319,6 +331,60 @@ def check_python_i18n():
             "all %d generated sentences are translated" % len(tpl))
 
 
+def check_gate():
+    """Is the published application actually locked, and locked properly?"""
+    gate = os.path.join("app", "index.html")
+    if not os.path.exists(gate):
+        add("ERROR", "gate", "app/index.html is missing, run tools/make_gate.py")
+        return
+    html = read(gate)
+
+    m = re.search(r'const D=\{s:"([^"]+)",i:"([^"]+)",c:"([^"]+)"\};', html)
+    if not m:
+        add("ERROR", "gate", "the login page carries no encrypted payload")
+        return
+    salt, iv, ct = m.groups()
+    try:
+        raw = base64.b64decode(ct)
+    except Exception:
+        add("ERROR", "gate", "the payload is not valid base64")
+        return
+
+    it = re.search(r"iterations:(\d+)", html)
+    iterations = int(it.group(1)) if it else 0
+    if iterations < 100_000:
+        add("ERROR", "gate",
+            "only %d PBKDF2 iterations, too few to slow guessing" % iterations)
+
+    # A gate that ships the application in the clear beside it is no gate.
+    for leak in ("dev.html", "app.html"):
+        if os.path.exists(os.path.join("app", leak)):
+            add("ERROR", "gate",
+                "app/%s would serve the application unlocked" % leak)
+
+    # the ciphertext must not contain recognisable source
+    head = raw[:4096]
+    if b"<html" in head or b"function " in head or b"AdsorpFit" in head:
+        add("ERROR", "gate", "the payload looks like plaintext")
+
+    # the credentials must not be recoverable from the repository
+    for path in ("tools/make_gate.py", "README.md"):
+        if os.path.exists(path) and re.search(r"LOGIN_PW\s*=\s*['\"]", read(path)):
+            add("ERROR", "gate", "%s stores the password in the clear" % path)
+
+    add("OK", "gate", "application encrypted, %d KB payload, %d PBKDF2 iterations"
+        % (len(raw) / 1024, iterations))
+
+    # and the public half must not be gated by accident
+    land = read("index.html")
+    if "noindex" in land:
+        add("ERROR", "gate", "the landing page is marked noindex")
+    elif 'href="app/"' not in land:
+        add("WARN", "gate", "the landing page does not link to the tool")
+    else:
+        add("OK", "gate", "landing page is public and links to the tool")
+
+
 def check_seo():
     """Can a search engine see what this site is, without running Pyodide?"""
     html = read("index.html")
@@ -372,7 +438,7 @@ if __name__ == "__main__":
     for fn in (check_i18n, check_models, check_presets, check_assets,
                check_cache_busting, check_hygiene, check_external,
                check_notation, check_licence, check_accessibility, check_seo,
-               check_python_i18n):
+               check_python_i18n, check_gate):
         try:
             fn()
         except Exception as exc:

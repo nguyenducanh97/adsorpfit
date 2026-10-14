@@ -154,9 +154,13 @@ def splice(html, new):
         a = html.index(START)
         b = html.index(END) + len(END)
         return html[:a] + new + html[b:]
-    anchor = "  </section>\n</main>"
-    assert anchor in html, "could not find the end of the guide section"
-    return html.replace(anchor, new + "\n" + anchor, 1)
+    # The landing page leaves an explicit placeholder; the application page
+    # used to take the catalogue at the end of its guide section.
+    for anchor in ("  <!-- SEO:MODELS placeholder -->",
+                   "  </section>\n</main>"):
+        if anchor in html:
+            return html.replace(anchor, new + "\n" + anchor, 1)
+    raise AssertionError("found nowhere to put the model catalogue")
 
 
 def sitemap():

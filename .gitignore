@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# The readable bundle that tools/make_gate.py --dev writes. It is the whole
+# application in the clear; publishing it would walk straight past the login.
+app/dev.html

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<!-- BUILD INPUT, NOT A PAGE.
+     tools/make_gate.py inlines every stylesheet, script and Python
+     module named here into a single document, encrypts it, and
+     writes app/index.html. Opening this file directly does not run
+     the app: its asset paths are written relative to the site root,
+     so they do not resolve from src/. The public landing page is
+     ../index.html. -->
+<!-- data-motion is deliberately absent: Prefs sets it once it has read
+     the saved choice, and until then the operating system's reduce-motion
+     setting decides, which is what the media query in style.css keys on. -->
+<html lang="en" data-theme="light" data-layout="side" data-density="comfy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- data-motion is set here, before the first paint, rather than when
+     Prefs initialises a few milliseconds later. The loading screen is
+     rendered in that gap, so deciding motion afterwards left its animation
+     to be governed by whatever the stylesheet did while the attribute was
+     missing. With the attribute always present there is one source of
+     truth, the CSS keys on it alone, and the operating system's
+     reduce-motion setting is consulted only to pick the default for a
+     first-time visitor, exactly as Prefs does. The two must agree, so if
+     you change the rule in js/prefs.js change it here too. -->
+<script>
+(function () {
+  var m = "full";
+  try {
+    var raw = localStorage.getItem("adsorpfit-prefs");
+    if (raw) {
+      m = (JSON.parse(raw) || {}).motion || "full";
+    } else if (window.matchMedia &&
+               window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      m = "off";
+    }
+  } catch (e) { m = "full"; }
+  document.documentElement.setAttribute("data-motion", m);
+})();
+</script>
+<title>AdsorpFit: Adsorption Kinetics, Isotherm & Thermodynamic Fitting</title>
+<meta name="description" content="Free browser-based fitting of adsorption kinetics, isotherm and thermodynamic data. 34 models, non-linear regression, publication-quality figures and automatic interpretation of every parameter. A product of SWAT Lab and UTOP.">
+<meta name="keywords" content="adsorption isotherm fitting, adsorption kinetics fitting, Langmuir, Freundlich, Sips, Redlich-Peterson, Temkin, pseudo-first-order, pseudo-second-order, Elovich, Avrami, intraparticle diffusion, van 't Hoff, thermodynamic parameters, adsorption calculator, non-linear regression">
+<meta name="author" content="Nguyen Duc Anh, SWAT Lab, Sungkyunkwan University">
+<meta name="robots" content="noindex, nofollow">
+<!-- Proves to Google Search Console that this site is ours. Removing it
+     un-verifies the property, so leave it in place. -->
+<meta name="google-site-verification" content="TqU7-d-Ls7DnYvSaAy6HLmg8auRnoixQYdA9qe4ckLk">
+<meta name="theme-color" content="#37c8cf">
+<link rel="canonical" href="https://nguyenducanh97.github.io/adsorpfit/">
+
+<!-- Link previews, and what a crawler quotes back in a result card. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AdsorpFit">
+<meta property="og:url" content="https://nguyenducanh97.github.io/adsorpfit/">
+<meta property="og:title" content="AdsorpFit: Adsorption Kinetics, Isotherm &amp; Thermodynamic Fitting">
+<meta property="og:description" content="Fit 21 isotherm models, 13 kinetic models and van 't Hoff thermodynamics to your own adsorption data, free and entirely in your browser. Nothing is uploaded.">
+<meta property="og:image" content="https://nguyenducanh97.github.io/adsorpfit/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="AdsorpFit, showing a Langmuir isotherm fitted to phosphate uptake data">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AdsorpFit: adsorption data fitting in your browser">
+<meta name="twitter:description" content="21 isotherm models, 13 kinetic models, van 't Hoff thermodynamics, publication-quality figures. Free and open source.">
+<meta name="twitter:image" content="https://nguyenducanh97.github.io/adsorpfit/assets/og-card.png">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="css/marks.css?v=43">
+<link rel="stylesheet" href="css/style.css?v=43">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+<!-- Structured data. Every claim here is one the site actually meets:
+     it is free, it needs no account, and it runs in the browser. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AdsorpFit",
+  "url": "https://nguyenducanh97.github.io/adsorpfit/",
+  "applicationCategory": "ScienceApplication",
+  "applicationSubCategory": "Adsorption data analysis",
+  "operatingSystem": "Any, runs in a web browser",
+  "browserRequirements": "Requires WebAssembly, supported by current Chrome, Firefox, Edge and Safari",
+  "description": "AdsorpFit fits 21 adsorption isotherm models and 13 adsorption kinetic models to measured data by bounded non-linear least squares, ranks them by AICc, checks that the data lie inside each model's valid domain, derives van 't Hoff thermodynamic parameters, and explains every fitted parameter in writing. All computation runs locally in the browser.",
+  "inLanguage": ["en", "ko"],
+  "isAccessibleForFree": true,
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "featureList": [
+    "21 adsorption isotherm models including Langmuir, Freundlich, Sips, Toth, Redlich-Peterson, Temkin and Dubinin-Radushkevich",
+    "13 adsorption kinetic models including pseudo-first-order, pseudo-second-order, Elovich, Avrami and intraparticle diffusion",
+    "van 't Hoff thermodynamics with six documented routes to a dimensionless equilibrium constant",
+    "Parameter standard errors, 95 percent confidence intervals and AICc model ranking",
+    "Automatic model recommendation from the shape of the data",
+    "Publication-quality figures exportable as PNG, PDF, SVG, EPS and TIFF"
+  ],
+  "creator": {
+    "@type": "Person",
+    "name": "Nguyen Duc Anh",
+    "email": "nguyenducanh@g.skku.edu",
+    "affiliation": {
+      "@type": "Organization",
+      "name": "SWAT Lab, Sustainable Water Treatment Laboratory",
+      "url": "http://www.swatlab.or.kr/",
+      "parentOrganization": {
+        "@type": "CollegeOrUniversity",
+        "name": "Sungkyunkwan University",
+        "url": "https://www.skku.edu/"
+      }
+    }
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ===================== water background ===================== -->
+<div id="water-bg" aria-hidden="true">
+  <canvas id="caustics"></canvas>
+  <div class="waves">
+    <svg viewBox="0 0 2400 320" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="wg1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6fdce1"/><stop offset="100%" stop-color="#2aa9bd"/>
+        </linearGradient>
+        <linearGradient id="wg2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#37c8cf"/><stop offset="100%" stop-color="#12374d"/>
+        </linearGradient>
+        <linearGradient id="wg3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1a93a8"/><stop offset="100%" stop-color="#060e17"/>
+        </linearGradient>
+      </defs>
+      <g class="wave-layer wave-3">
+        <path fill="url(#wg3)" d="M0,190 C200,140 400,240 600,190 C800,140 1000,240 1200,190 C1400,140 1600,240 1800,190 C2000,140 2200,240 2400,190 L2400,320 L0,320 Z"/>
+      </g>
+      <g class="wave-layer wave-2">
+        <path fill="url(#wg2)" d="M0,215 C150,175 350,255 600,215 C850,175 1050,255 1200,215 C1350,175 1550,255 1800,215 C2050,175 2250,255 2400,215 L2400,320 L0,320 Z"/>
+      </g>
+      <g class="wave-layer wave-1">
+        <path fill="url(#wg1)" d="M0,245 C240,210 360,280 600,245 C840,210 960,280 1200,245 C1440,210 1560,280 1800,245 C2040,210 2160,280 2400,245 L2400,320 L0,320 Z"/>
+      </g>
+    </svg>
+  </div>
+  <div id="bubbles"></div>
+</div>
+
+<!-- ===================== boot overlay ===================== -->
+<div id="boot">
+  <div class="boot-card">
+
+    <div class="boot-title">Adsorp<b>Fit</b></div>
+    <div class="boot-tagline" data-i18n="boot.tagline">Adsorption kinetics, isotherms and thermodynamics, fitted in your browser</div>
+
+    <!-- The subject of the whole site, drawn while it loads: adsorbate
+         settling into a finite number of identical surface sites on the
+         left, and on the right the isotherm that behaviour produces,
+         climbing towards the q_max it can never quite reach. The curve is
+         a genuine Langmuir shape, its geometry computed rather than
+         sketched. -->
+    <svg class="boot-art" viewBox="0 0 460 168" role="img" aria-labelledby="boot-art-title">
+      <title id="boot-art-title">Molecules filling a monolayer of surface sites, and the Langmuir isotherm that describes it</title>
+
+      <!-- ---------------- adsorption onto the surface ---------------- -->
+      <g class="ba-mol">
+        <circle cx="26"  cy="115" r="6.5" style="animation-delay:0s"/>
+        <circle cx="50"  cy="115" r="6.5" style="animation-delay:.5s"/>
+        <circle cx="74"  cy="115" r="6.5" style="animation-delay:1s"/>
+        <circle cx="98"  cy="115" r="6.5" style="animation-delay:1.5s"/>
+        <circle cx="122" cy="115" r="6.5" style="animation-delay:2s"/>
+        <circle cx="146" cy="115" r="6.5" style="animation-delay:2.5s"/>
+        <circle cx="170" cy="115" r="6.5" style="animation-delay:3s"/>
+      </g>
+
+      <g class="ba-sites">
+        <rect x="19.5"  y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="43.5"  y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="67.5"  y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="91.5"  y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="115.5" y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="139.5" y="119" width="13" height="3.5" rx="1.7"/>
+        <rect x="163.5" y="119" width="13" height="3.5" rx="1.7"/>
+      </g>
+
+      <rect class="ba-slab" x="14" y="122" width="176" height="15" rx="3"/>
+      <g class="ba-hatch">
+        <path d="M22 137 L14 147"/><path d="M56 137 L48 147"/>
+        <path d="M90 137 L82 147"/><path d="M124 137 L116 147"/>
+        <path d="M158 137 L150 147"/><path d="M190 137 L182 147"/>
+      </g>
+
+      <line class="ba-rule" x1="218" y1="26" x2="218" y2="148"/>
+
+      <!-- ---------------- the isotherm it produces ---------------- -->
+      <line class="ba-axis" x1="256" y1="18"  x2="256" y2="140"/>
+      <line class="ba-axis" x1="256" y1="140" x2="448" y2="140"/>
+      <line class="ba-asym" x1="256" y1="34"  x2="446" y2="34"/>
+
+      <path class="ba-curve" fill="none" d="M 256.0 140.0 L 263.3 111.6 L 270.6 95.2 L 277.9 84.6 L 285.2 77.1 L 292.5 71.5 L 299.8 67.2 L 307.2 63.8 L 314.5 61.0 L 321.8 58.7 L 329.1 56.8 L 336.4 55.1 L 343.7 53.7 L 351.0 52.4 L 358.3 51.3 L 365.6 50.4 L 372.9 49.5 L 380.2 48.7 L 387.5 48.0 L 394.8 47.3 L 402.2 46.8 L 409.5 46.2 L 416.8 45.7 L 424.1 45.3 L 431.4 44.9 L 438.7 44.5 L 446.0 44.1"/>
+
+      <g class="ba-pts">
+        <circle cx="265.5" cy="105.9" r="3.4" style="animation-delay:.55s"/>
+        <circle cx="275.0" cy="88.4"  r="3.4" style="animation-delay:1.05s"/>
+        <circle cx="294.0" cy="70.6"  r="3.4" style="animation-delay:1.55s"/>
+        <circle cx="332.0" cy="56.1"  r="3.4" style="animation-delay:2.05s"/>
+        <circle cx="389.0" cy="47.9"  r="3.4" style="animation-delay:2.55s"/>
+        <circle cx="446.0" cy="44.1"  r="3.4" style="animation-delay:3.05s"/>
+      </g>
+
+      <text class="ba-lab" x="446" y="29" text-anchor="end">q<tspan dy="2.6" font-size="7.5">max</tspan></text>
+      <text class="ba-lab" x="448" y="153" text-anchor="end">C<tspan dy="2.6" font-size="7.5">e</tspan></text>
+      <text class="ba-lab" transform="translate(247,92) rotate(-90)" text-anchor="middle">q<tspan dy="2.6" font-size="7.5">e</tspan></text>
+    </svg>
+
+    <div class="boot-fact" id="boot-fact" aria-live="polite"></div>
+
+    <div class="boot-bar"><i id="boot-bar"></i></div>
+    <div class="boot-msg" id="boot-msg">Starting the scientific Python runtime…</div>
+
+    <div class="boot-brand">
+      <span class="mark mark-swat" role="img" aria-label="SWAT Lab"></span>
+      <span class="vr"></span>
+      <span class="mark mark-skku" role="img" aria-label="Sungkyunkwan University"></span>
+      <span class="vr"></span>
+      <span class="mark mark-utop" role="img" aria-label="U-TOP Pioneer"></span>
+    </div>
+    <p class="boot-by">
+      <span data-i18n="brand.product">A product of</span>
+      <b>SWAT Lab</b><span data-i18n="boot.by">, Sustainable Water Treatment Laboratory, and U-TOP, Sungkyunkwan University</span>
+    </p>
+
+    <p class="boot-privacy">
+      <span data-i18n="help.boot">This loads NumPy, SciPy and Matplotlib into your browser. It happens once per visit and takes roughly 10–20 seconds. Nothing you enter ever leaves your computer, all fitting runs locally.</span>
+    </p>
+  </div>
+</div>
+
+<!-- ===================== masthead ===================== -->
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brandwrap">
+      <a class="labchip" href="http://www.swatlab.or.kr/" target="_blank" rel="noopener"
+         title="SWAT Lab, Sustainable Water Treatment Laboratory, Sungkyunkwan University">
+        <span class="mark mark-swat" role="img" aria-label="SWAT Lab"></span>
+      </a>
+      <span class="vr"></span>
+      <div class="title">
+        <h1>Adsorp<b>Fit</b><span class="ver">v1.0</span></h1>
+        <p data-i18n="brand.sub">Adsorption data modelling</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button role="tab" data-tab="kinetics" aria-selected="true" data-i18n="tab.kinetics">Kinetics</button>
+      <button role="tab" data-tab="isotherm" aria-selected="false" data-i18n="tab.isotherm">Isotherms</button>
+      <button role="tab" data-tab="thermo" aria-selected="false" data-i18n="tab.thermo">Thermodynamics</button>
+      <button role="tab" data-tab="guide" aria-selected="false" data-i18n="tab.guide">Guide</button>
+    </nav>
+    <div class="masthead-tools">
+      <button class="tool-btn" id="projects-btn" title="Save, rename and reopen projects">
+        <span class="ti"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <path d="M17 21v-8H7v8M7 3v5h8"/></svg></span>
+        <span data-i18n="proj.title">Projects</span>
+        <span class="proj-badge hidden" id="proj-current"></span>
+      </button>
+      <button class="tool-btn" id="resetlayout-btn" title="Restore the default panel arrangement">
+        <span class="ti"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="18" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="9" rx="1.5"/>
+          <rect x="14" y="16" width="7" height="5" rx="1.5"/></svg></span>
+        <span data-i18n="set.layoutBtn">Layout</span>
+      </button>
+      <div class="lang-switch" id="lang-switch"></div>
+      <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- ================= KINETICS ================= -->
+  <section id="panel-kinetics" class="tabpane">
+    <div class="grid-2">
+      <div class="col-left">
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="panel.data">1 · Data</h2>
+            <span class="hint" id="kin-count" data-i18n="lbl.noData">no data</span>
+          </div>
+          <div class="panel-body">
+            <div class="btn-row" style="margin-bottom:12px">
+              <select class="preset-pick" data-preset="kinetics"
+                      aria-label="Choose an example dataset"></select>
+              <button class="btn sm" data-clear="kinetics" data-i18n="btn.clear">Clear</button>
+              <label class="btn sm" style="margin:0">
+                <span data-i18n="btn.upload">Upload CSV</span>
+                <input type="file" accept=".csv,.txt,.tsv" hidden data-file="kinetics">
+              </label>
+            </div>
+            <label class="field">
+              <span class="lbl" data-i18n="data.pasteKinetics">Paste two columns: time and q<sub>t</sub></span>
+              <textarea id="kin-data" rows="9" spellcheck="false"
+                placeholder="t (min)&#9;qt (mg/g)&#10;5&#9;22.8&#10;10&#9;36.4&#10;…"></textarea>
+              <span class="sub" data-i18n="help.kinData">Tab, comma, semicolon or space separated. A header row is detected automatically. Column 1 = time, column 2 = qt. Optional column 3 = error bars on qt.</span>
+            </label>
+            <div class="row c2">
+              <label class="field"><span class="lbl" data-i18n="lbl.timeUnit">Time unit</span>
+                <select id="kin-tunit"><option>min</option><option>h</option><option>s</option><option>d</option></select>
+              </label>
+              <label class="field"><span class="lbl" data-i18n="lbl.qUnit">q unit</span>
+                <select id="kin-qunit"><option>mg g⁻¹</option><option>mmol g⁻¹</option><option>µmol g⁻¹</option><option>mg kg⁻¹</option></select>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.experiment">2 · Experiment</h2></div>
+          <div class="panel-body">
+            <div class="row c2">
+              <label class="field"><span class="lbl" data-i18n="lbl.temperature">Temperature (K)</span>
+                <input type="number" id="kin-T" value="298.15" step="0.01"></label>
+              <label class="field"><span class="lbl" data-i18n="lbl.c0">C₀ (mg L⁻¹)</span>
+                <input type="number" id="kin-C0" value="100" step="any"></label>
+              <label class="field"><span class="lbl" data-i18n="lbl.dose">Adsorbent dose (g L⁻¹)</span>
+                <input type="number" id="kin-dose" value="1" step="any"></label>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.radius">Particle radius (cm)</span>
+                  <button type="button" class="field-info" data-help="radius"
+                    aria-label="What is this for?">?</button></span>
+                <input type="number" id="kin-radius" value="0.05" step="any">
+                <span class="sub" data-i18n="help.radius">For Boyd and Crank diffusion coefficients.</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="kin-advisor-panel">
+          <div class="panel-head">
+            <h2 data-i18n="panel.advisor">Model advisor</h2>
+            <span class="hint">
+              <button class="btn ghost sm" data-advise="kinetics" data-i18n="btn.advise">Analyse my data</button>
+            </span>
+          </div>
+          <div class="panel-body" id="kin-advice">
+            <p class="tiny" style="margin:0" data-i18n="adv.none">Run the analysis to see which models your data can actually support.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.models">3 · Models</h2>
+            <span class="hint"><a href="#" class="btn ghost sm" data-selectall="kinetics" data-i18n="btn.all">all</a>
+            <a href="#" class="btn ghost sm" data-selectnone="kinetics" data-i18n="btn.none">none</a></span></div>
+          <div class="panel-body" id="kin-models"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.options">4 · Fitting options</h2></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl" data-i18n="lbl.weighting">Residual weighting</span>
+              <select id="kin-weights">
+                <option value="none" data-i18n="opt.ols">Ordinary least squares (equal weight)</option>
+                <option value="relative" data-i18n="opt.rel">Relative error (1/y)</option>
+                <option value="sqrt" data-i18n="opt.sqrt">Poisson-like (1/√y)</option>
+              </select></label>
+            <label class="field"><span class="lbl" data-i18n="lbl.criterion">Ranking criterion</span>
+              <select id="kin-criterion">
+                <option value="AICc">AICc: corrected Akaike (recommended)</option>
+                <option value="AIC">AIC</option>
+                <option value="BIC">BIC: stronger complexity penalty</option>
+                <option value="RMSE">RMSE: no complexity penalty</option>
+              </select></label>
+            <label class="inline-check"><input type="checkbox" id="kin-linear" checked>
+              <span data-i18n="lbl.alsoLinear">Also compute classical linearised fits for comparison</span></label>
+            <button class="btn primary" id="kin-run" style="width:100%;justify-content:center;margin-top:10px"
+              data-i18n="btn.fit">Fit models</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-right"><div id="kin-results"></div></div>
+    </div>
+  </section>
+
+  <!-- ================= ISOTHERMS ================= -->
+  <section id="panel-isotherm" class="tabpane hidden">
+    <div class="grid-2">
+      <div class="col-left">
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.data">1 · Data</h2>
+            <span class="hint" id="iso-count" data-i18n="lbl.noData">no data</span></div>
+          <div class="panel-body">
+            <div class="btn-row" style="margin-bottom:12px">
+              <select class="preset-pick" data-preset="isotherm"
+                      aria-label="Choose an example dataset"></select>
+              <button class="btn sm" data-clear="isotherm" data-i18n="btn.clear">Clear</button>
+              <label class="btn sm" style="margin:0"><span data-i18n="btn.upload">Upload CSV</span>
+                <input type="file" accept=".csv,.txt,.tsv" hidden data-file="isotherm"></label>
+            </div>
+            <label class="field">
+              <span class="lbl" data-i18n="data.pasteIsotherm">Paste two columns: C<sub>e</sub> and q<sub>e</sub></span>
+              <textarea id="iso-data" rows="9" spellcheck="false"
+                placeholder="Ce (mg/L)&#9;qe (mg/g)&#10;0.5&#9;8.1&#10;1.2&#9;17.9&#10;…"></textarea>
+              <span class="sub" data-i18n="help.isoData">Column 1 = equilibrium concentration Ce, column 2 = equilibrium loading qe. Optional column 3 = error bars. Optional column 4 = initial concentration C0 (enables the Langmuir separation factor RL).</span>
+            </label>
+            <div class="row c2">
+              <label class="field"><span class="lbl" data-i18n="lbl.cUnit">C unit</span>
+                <select id="iso-cunit"><option>mg L⁻¹</option><option>mmol L⁻¹</option><option>µmol L⁻¹</option><option>mol L⁻¹</option></select></label>
+              <label class="field"><span class="lbl" data-i18n="lbl.qUnit">q unit</span>
+                <select id="iso-qunit"><option>mg g⁻¹</option><option>mmol g⁻¹</option><option>µmol g⁻¹</option></select></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.experiment">2 · Experiment</h2></div>
+          <div class="panel-body">
+            <div class="row c2">
+              <label class="field"><span class="lbl" data-i18n="lbl.temperature">Temperature (K)</span>
+                <input type="number" id="iso-T" value="298.15" step="0.01"></label>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.mw">Molar mass (g mol⁻¹)</span>
+                  <button type="button" class="field-info" data-help="mw"
+                    aria-label="What is this for?">?</button></span>
+                <input type="number" id="iso-MW" value="" step="any" placeholder="e.g. 194.19 for caffeine">
+                <span class="sub" data-i18n="help.mwShort">Of the adsorbate, not the
+                  adsorbent. Only Dubinin–Radushkevich and the thermodynamics tab use
+                  it.</span></label>
+              <label class="field"><span class="lbl">
+                  <span data-i18n="lbl.cs">Solubility C<sub>s</sub> (mg L⁻¹)</span>
+                  <button type="button" class="field-info" data-help="cs"
+                    aria-label="What is this for?">?</button></span>
+                <input type="number" id="iso-Cs" value="" step="any" placeholder="e.g. 43600 for methylene blue">
+                <span class="sub" data-i18n="help.csShort">How much dissolves before
+                  the water saturates. Only the BET model uses it.</span></label>
+              <label class="field"><span class="lbl" data-i18n="lbl.dose">Adsorbent dose (g L⁻¹)</span>
+                <input type="number" id="iso-dose" value="1" step="any"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="iso-advisor-panel">
+          <div class="panel-head">
+            <h2 data-i18n="panel.advisor">Model advisor</h2>
+            <span class="hint">
+              <button class="btn ghost sm" data-advise="isotherm" data-i18n="btn.advise">Analyse my data</button>
+            </span>
+          </div>
+          <div class="panel-body" id="iso-advice">
+            <p class="tiny" style="margin:0" data-i18n="adv.none">Run the analysis to see which models your data can actually support.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.models">3 · Models</h2>
+            <span class="hint"><a href="#" class="btn ghost sm" data-selectall="isotherm" data-i18n="btn.all">all</a>
+            <a href="#" class="btn ghost sm" data-selectnone="isotherm" data-i18n="btn.none">none</a></span></div>
+          <div class="panel-body" id="iso-models"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="panel.options">4 · Fitting options</h2></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl" data-i18n="lbl.weighting">Residual weighting</span>
+              <select id="iso-weights">
+                <option value="none" data-i18n="opt.ols">Ordinary least squares (equal weight)</option>
+                <option value="relative" data-i18n="opt.rel">Relative error (1/y)</option>
+                <option value="sqrt" data-i18n="opt.sqrt">Poisson-like (1/√y)</option>
+              </select></label>
+            <label class="field"><span class="lbl" data-i18n="lbl.criterion">Ranking criterion</span>
+              <select id="iso-criterion">
+                <option value="AICc">AICc: corrected Akaike (recommended)</option>
+                <option value="AIC">AIC</option>
+                <option value="BIC">BIC</option>
+                <option value="RMSE">RMSE</option>
+              </select></label>
+            <label class="inline-check"><input type="checkbox" id="iso-linear" checked>
+              <span data-i18n="lbl.alsoLinear">Also compute classical linearised fits</span></label>
+            <button class="btn primary" id="iso-run" style="width:100%;justify-content:center;margin-top:10px"
+              data-i18n="btn.fit">Fit models</button>
+          </div>
+        </div>
+      </div>
+      <div class="col-right"><div id="iso-results"></div></div>
+    </div>
+  </section>
+
+  <!-- ================= THERMODYNAMICS ================= -->
+  <section id="panel-thermo" class="tabpane hidden">
+    <div class="grid-2">
+      <div class="col-left">
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="th.step1">1 · Isotherms at several temperatures</h2></div>
+          <div class="panel-body">
+            <p class="tiny" style="margin-top:0">
+              <span data-i18n="help.thermoIntro">Enter one isotherm dataset per temperature. AdsorpFit fits your chosen isotherm model at each temperature, converts its constant into a properly dimensionless K°, and runs the van't Hoff analysis.</span>
+            </p>
+            <div class="btn-row" style="margin:12px 0 8px">
+              <select class="preset-pick" data-preset="thermo" id="th-preset"
+                      aria-label="Choose an example dataset"></select>
+              <button class="btn sm" data-clear="thermo" data-i18n="btn.clear">Clear</button>
+            </div>
+            <div class="preset-cite" id="th-preset-note" hidden></div>
+            <div class="btn-row" style="margin:0 0 12px">
+              <button class="btn sm" id="th-add" data-i18n="btn.addTemp">+ Add temperature</button>
+              <button class="btn sm" data-demo="thermo" data-i18n="btn.example">Load example</button>
+            </div>
+            <div id="th-datasets"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="th.step2">2 · Equilibrium constant</h2>
+            <span class="hint" data-i18n="th.routeHint">this choice changes ΔG°</span></div>
+          <div class="panel-body">
+            <label class="field"><span class="lbl" data-i18n="th.modelLbl">Isotherm model to fit at each T</span>
+              <select id="th-model"></select></label>
+            <label class="field"><span class="lbl" data-i18n="th.routeLbl">Route to a dimensionless K°</span>
+              <select id="th-route"></select></label>
+            <div id="th-route-note" class="callout info" style="margin-bottom:0">
+              <span class="ci">ℹ</span><span></span>
+            </div>
+            <label class="field" style="margin-top:12px">
+              <span class="lbl" data-i18n="lbl.mw">Adsorbate molar mass (g mol⁻¹)</span>
+              <input type="number" id="th-MW" step="any" placeholder="required for the Langmuir route">
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 data-i18n="th.step3">3 · Optional analyses</h2></div>
+          <div class="panel-body">
+            <label class="inline-check"><input type="checkbox" id="th-nonlinear">
+              Non-linear van't Hoff with a ΔC<sub>p</sub> term (needs ≥ 4 temperatures)</label>
+            <label class="inline-check"><input type="checkbox" id="th-isosteric" checked>
+              Isosteric heat of adsorption vs. surface loading</label>
+            <label class="inline-check"><input type="checkbox" id="th-arrhenius">
+              Arrhenius activation energy from kinetic rate constants</label>
+            <div id="th-arr-box" class="hidden" style="margin-top:10px">
+              <label class="field"><span class="lbl">T (K) and rate constant k, one pair per line</span>
+                <textarea id="th-arr-data" rows="5" spellcheck="false"
+                  placeholder="293.15&#9;0.0121&#10;303.15&#9;0.0198&#10;313.15&#9;0.0315"></textarea></label>
+            </div>
+            <button class="btn primary" id="th-run" style="width:100%;justify-content:center;margin-top:12px"
+              data-i18n="btn.runThermo">Run thermodynamic analysis</button>
+          </div>
+        </div>
+      </div>
+      <div class="col-right"><div id="th-results"></div></div>
+    </div>
+  </section>
+
+  <!-- ================= GUIDE ================= -->
+  <section id="panel-guide" class="tabpane hidden">
+    <div class="panel" style="max-width:880px;margin:22px auto">
+      <div class="panel-head"><h2>How to use AdsorpFit: and how to read what it tells you</h2></div>
+      <div class="panel-body" id="guide-body"></div>
+    </div>
+<!-- SEO:MODELS start, generated by tools/make_seo.py -->
+    <div class="panel mi-panel" id="model-index">
+      <div class="panel-head"><h2>Every model AdsorpFit can fit</h2></div>
+      <div class="panel-body">
+        <p>AdsorpFit fits 21 adsorption isotherm models and 13 adsorption kinetic
+        models to your own measurements, then runs a full van 't Hoff
+        thermodynamic analysis, entirely inside your browser. Fitting is by
+        bounded non-linear least squares, with linearised forms offered
+        alongside for comparison. Every fit returns parameter standard errors,
+        95% confidence intervals, AICc ranking against the other models you
+        selected, checks that the data actually fall inside the model's valid
+        domain, and a written interpretation of what the numbers mean. Nothing
+        you paste is uploaded anywhere.</p>
+
+        <h3>Adsorption isotherm models (21)</h3>
+        <dl class="model-index">
+          <dt id="model-langmuir">Langmuir <span class="mi-year">1918</span></dt>
+          <dd>Adsorption is confined to a monolayer, with no stacking of adsorbate. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>L</sub>.</span> <cite>Langmuir, I. (1918) J. Am. Chem. Soc. 40, 1361-1403.</cite></dd>
+          <dt id="model-freundlich">Freundlich <span class="mi-year">1906</span></dt>
+          <dd>The surface is energetically heterogeneous, with an exponential distribution of site energies. <span class="mi-p">Fitted parameters: K<sub>F</sub>, n.</span> <cite>Freundlich, H.M.F. (1906) Z. Phys. Chem. 57, 385-470.</cite></dd>
+          <dt id="model-temkin">Temkin <span class="mi-year">1940</span></dt>
+          <dd>The heat of adsorption of all molecules in the layer decreases linearly with surface coverage, because of adsorbate–adsorbate repulsion. <span class="mi-p">Fitted parameters: A<sub>T</sub>, b<sub>T</sub>.</span> <cite>Temkin, M.J. &amp; Pyzhev, V. (1940) Acta Physiochim. URSS 12, 217-222.</cite></dd>
+          <dt id="model-dubinin-radushkevich">Dubinin–Radushkevich <span class="mi-year">1947</span></dt>
+          <dd>Adsorption proceeds by pore filling rather than layer-by-layer coverage. <span class="mi-p">Fitted parameters: q<sub>s</sub>, K<sub>ad</sub>.</span> <cite>Dubinin, M.M. &amp; Radushkevich, L.V. (1947) Proc. Acad. Sci. USSR 55, 331-337.</cite></dd>
+          <dt id="model-jovanovic">Jovanović <span class="mi-year">1969</span></dt>
+          <dd>Monolayer coverage as in Langmuir, but allowing for mechanical contact between adsorbing and desorbing molecules. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>J</sub>.</span> <cite>Jovanović, D.S. (1969) Kolloid-Z. Z. Polym. 235, 1203-1214.</cite></dd>
+          <dt id="model-halsey">Halsey <span class="mi-year">1948</span></dt>
+          <dd>Describes multilayer adsorption at a relatively large distance from the surface. <span class="mi-p">Fitted parameters: K<sub>H</sub>, n<sub>H</sub>.</span> <cite>Halsey, G. (1948) J. Chem. Phys. 16, 931-937.</cite></dd>
+          <dt id="model-harkins-jura">Harkins–Jura <span class="mi-year">1944</span></dt>
+          <dd>Multilayer adsorption on a heterogeneous pore distribution. <span class="mi-p">Fitted parameters: A, B.</span> <cite>Harkins, W.D. &amp; Jura, G. (1944) J. Chem. Phys. 12, 112-113.</cite></dd>
+          <dt id="model-bet">BET (liquid phase) <span class="mi-year">1938</span></dt>
+          <dd>Multilayer adsorption: molecules adsorb on top of already-adsorbed molecules. <span class="mi-p">Fitted parameters: q<sub>s</sub>, C<sub>BET</sub>.</span> <cite>Brunauer, S., Emmett, P.H. &amp; Teller, E. (1938) J. Am. Chem. Soc. 60, 309-319.</cite></dd>
+          <dt id="model-elovich-isotherm">Elovich (isotherm) <span class="mi-year">1962</span></dt>
+          <dd>Adsorption sites increase exponentially with coverage, implying multilayer adsorption. <span class="mi-p">Fitted parameters: q<sub>m</sub>, K<sub>E</sub>.</span> <cite>Elovich, S.Y. &amp; Larinov, O.G. (1962) Izv. Akad. Nauk. SSSR, Otd. Khim. Nauk 2, 209-216.</cite></dd>
+          <dt id="model-sips">Sips (Langmuir–Freundlich) <span class="mi-year">1948</span></dt>
+          <dd>A hybrid of Langmuir and Freundlich: Freundlich-like at low Ce, Langmuir-like at high Ce. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>s</sub>, m<sub>s</sub>.</span> <cite>Sips, R. (1948) J. Chem. Phys. 16, 490-495.</cite></dd>
+          <dt id="model-toth">Tóth <span class="mi-year">1971</span></dt>
+          <dd>Derived from potential theory for heterogeneous adsorption. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>T</sub>, n<sub>T</sub>.</span> <cite>Tóth, J. (1971) Acta Chim. Acad. Sci. Hung. 69, 311-328.</cite></dd>
+          <dt id="model-redlich-peterson">Redlich–Peterson <span class="mi-year">1959</span></dt>
+          <dd>An empirical hybrid of Langmuir and Freundlich. <span class="mi-p">Fitted parameters: K<sub>RP</sub>, a<sub>RP</sub>, g.</span> <cite>Redlich, O. &amp; Peterson, D.L. (1959) J. Phys. Chem. 63, 1024-1026.</cite></dd>
+          <dt id="model-khan">Khan <span class="mi-year">1996</span></dt>
+          <dd>A general model for pure solutions, intended for multi-component systems. <span class="mi-p">Fitted parameters: q<sub>max</sub>, b<sub>K</sub>, a<sub>K</sub>.</span> <cite>Khan, A.R., Al-Waheab, I.R. &amp; Al-Haddad, A. (1996) Environ. Technol. 17, 13-23.</cite></dd>
+          <dt id="model-radke-prausnitz">Radke–Prausnitz <span class="mi-year">1972</span></dt>
+          <dd>Performs particularly well at dilute concentrations, its original purpose. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>RP</sub>, m<sub>RP</sub>.</span> <cite>Radke, C.J. &amp; Prausnitz, J.M. (1972) Ind. Eng. Chem. Fundam. 11, 445-451.</cite></dd>
+          <dt id="model-hill">Hill <span class="mi-year">1910</span></dt>
+          <dd>Derived for binding of a ligand to a homogeneous substrate. <span class="mi-p">Fitted parameters: q<sub>SH</sub>, K<sub>D</sub>, n<sub>H</sub>.</span> <cite>Hill, A.V. (1910) J. Physiol. 40, iv-vii.</cite></dd>
+          <dt id="model-koble-corrigan">Koble–Corrigan <span class="mi-year">1952</span></dt>
+          <dd>An empirical combination of the Langmuir and Freundlich forms. <span class="mi-p">Fitted parameters: A, B, n.</span> <cite>Koble, R.A. &amp; Corrigan, T.E. (1952) Ind. Eng. Chem. 44, 383-387.</cite></dd>
+          <dt id="model-brouers-sotolongo">Brouers–Sotolongo (deformed Weibull) <span class="mi-year">2005</span></dt>
+          <dd>Derived from a statistical distribution of adsorption energies (a deformed exponential / Weibull form). <span class="mi-p">Fitted parameters: q<sub>max</sub>, K<sub>BS</sub>, α.</span> <cite>Brouers, F. et al. (2005) J. Hazard. Mater. 138, 591-597.</cite></dd>
+          <dt id="model-vieth-sladek">Vieth–Sladek <span class="mi-year">1965</span></dt>
+          <dd>Two populations of adsorbate coexist: one dissolved into the solid following Henry's law, one bound to discrete sites following Langmuir. <span class="mi-p">Fitted parameters: k<sub>VS</sub>, q<sub>max</sub>, b.</span> <cite>Vieth, W.R. &amp; Sladek, K.J. (1965) J. Colloid Sci. 20, 1014-1033.</cite></dd>
+          <dt id="model-fritz-schlunder">Fritz–Schlünder (IV) <span class="mi-year">1974</span></dt>
+          <dd>A flexible empirical equation with no single mechanistic derivation. <span class="mi-p">Fitted parameters: A, B, α, β.</span> <cite>Fritz, W. &amp; Schlünder, E.U. (1974) Chem. Eng. Sci. 29, 1279-1282.</cite></dd>
+          <dt id="model-baudu">Baudu <span class="mi-year">1990</span></dt>
+          <dd>An extension of Langmuir in which the affinity b<sub>0</sub> is itself allowed to vary with coverage. <span class="mi-p">Fitted parameters: q<sub>max</sub>, b<sub>0</sub>, x, y.</span> <cite>Baudu, M. (1990) PhD thesis, Université de Rennes; see Limousin, G. et al. (2007) Appl. Geochem. 22, 249-275.</cite></dd>
+          <dt id="model-marczewski-jaroniec">Marczewski–Jaroniec <span class="mi-year">1983</span></dt>
+          <dd>Derived from a generalised (quasi-Gaussian) distribution of adsorption energies, with m and n controlling each tail independently. <span class="mi-p">Fitted parameters: q<sub>max</sub>, K, m, n.</span> <cite>Marczewski, A.W. &amp; Jaroniec, M. (1983) Monatsh. Chem. 114, 711-715.</cite></dd>
+        </dl>
+
+        <h3>Adsorption kinetic models (13)</h3>
+        <dl class="model-index">
+          <dt id="model-pfo">Pseudo-first-order (Lagergren) <span class="mi-year">1898</span></dt>
+          <dd>The uptake rate is proportional to the number of unoccupied sites, d q<sub>t</sub>/dt = k<sub>1</sub>(q<sub>e</sub> − q<sub>t</sub>). <span class="mi-p">Fitted parameters: q<sub>e,cal</sub>, k<sub>1</sub>.</span> <cite>Lagergren, S. (1898) Kungliga Svenska Vetenskapsakademiens Handlingar 24, 1-39.</cite></dd>
+          <dt id="model-pso">Pseudo-second-order (Ho &amp; McKay) <span class="mi-year">1999</span></dt>
+          <dd>The uptake rate is proportional to the square of the number of unoccupied sites, d q<sub>t</sub>/dt = k<sub>2</sub>(q<sub>e</sub> − q<sub>t</sub>)<sup>2</sup>. <span class="mi-p">Fitted parameters: q<sub>e,cal</sub>, k<sub>2</sub>.</span> <cite>Ho, Y.S. &amp; McKay, G. (1999) Process Biochem. 34, 451-465.</cite></dd>
+          <dt id="model-elovich">Elovich <span class="mi-year">1934</span></dt>
+          <dd>The activation energy for adsorption increases linearly with coverage. <span class="mi-p">Fitted parameters: α, β.</span> <cite>Roginsky, S. &amp; Zeldovich, Y.B. (1934) Acta Physicochim. URSS 1, 554-594; Chien, S.H. &amp; Clayton, W.R. (1980) Soil Sci. Soc. Am. J. 44, 265-268.</cite></dd>
+          <dt id="model-avrami">Avrami (fractional order) <span class="mi-year">1940</span></dt>
+          <dd>Adapted from nucleation and crystal-growth theory. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>AV</sub>, n<sub>AV</sub>.</span> <cite>Avrami, M. (1940) J. Chem. Phys. 8, 212-224; Lopes, E.C.N. et al. (2003) J. Colloid Interface Sci. 263, 542-547.</cite></dd>
+          <dt id="model-mixed-1-2">Mixed 1,2-order (MOE) <span class="mi-year">2010</span></dt>
+          <dd>Interpolates continuously between PFO and PSO rather than forcing a choice between them. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>MOE</sub>, f<sub>2</sub>.</span> <cite>Marczewski, A.W. (2010) Langmuir 26, 15229-15238.</cite></dd>
+          <dt id="model-nth-order">Pseudo-nth-order <span class="mi-year">2007</span></dt>
+          <dd>Generalises PFO and PSO by letting the order n be fitted. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>n</sub>, n.</span> <cite>Özer, A. (2007) J. Hazard. Mater. 141, 753-761.</cite></dd>
+          <dt id="model-ritchie">Ritchie nth-order <span class="mi-year">1977</span></dt>
+          <dd>Derived from the fraction of surface sites occupied, not from a concentration-driven rate law. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>R</sub>, n.</span> <cite>Ritchie, A.G. (1977) J. Chem. Soc. Faraday Trans. 1 73, 1650-1653.</cite></dd>
+          <dt id="model-fractal-pfo">Fractal-like pseudo-first-order <span class="mi-year">2012</span></dt>
+          <dd>The rate 'constant' is not constant: on a fractal or energetically disordered surface it decays as a power of time, k(t) = k′t^(−h). <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>1</sub>', h.</span> <cite>Kopelman, R. (1988) Science 241, 1620-1626; Haerifar, M. &amp; Azizian, S. (2012) J. Phys. Chem. C 116, 13111-13119.</cite></dd>
+          <dt id="model-weber-morris">Weber–Morris (intraparticle diffusion) <span class="mi-year">1963</span></dt>
+          <dd>Uptake varies with the square root of time when intraparticle diffusion controls the rate. <span class="mi-p">Fitted parameters: k<sub>id</sub>, C.</span> <cite>Weber, W.J. &amp; Morris, J.C. (1963) J. Sanit. Eng. Div. ASCE 89, 31-60.</cite></dd>
+          <dt id="model-film-diffusion">Liquid film diffusion (Boyd–Adamson) <span class="mi-year">1947</span></dt>
+          <dd>The rate is controlled by diffusion of adsorbate across the stagnant liquid film around the adsorbent particle. <span class="mi-p">Fitted parameters: q<sub>e</sub>, k<sub>fd</sub>.</span> <cite>Boyd, G.E., Adamson, A.W. &amp; Myers, L.S. (1947) J. Am. Chem. Soc. 69, 2836-2848.</cite></dd>
+          <dt id="model-bangham">Bangham (pore diffusion) <span class="mi-year">1924</span></dt>
+          <dd>Pore diffusion is the rate-controlling step. <span class="mi-p">Fitted parameters: k<sub>0</sub>, α.</span> <cite>Bangham, D.H. &amp; Burt, F.P. (1924) Proc. R. Soc. Lond. A 105, 481-488.</cite></dd>
+          <dt id="model-crank">Homogeneous surface diffusion (Crank) <span class="mi-year">1975</span></dt>
+          <dd>Spherical, homogeneous particles of uniform radius r. <span class="mi-p">Fitted parameters: q<sub>e</sub>, D, r.</span> <cite>Crank, J. (1975) The Mathematics of Diffusion, 2nd ed., Oxford.</cite></dd>
+          <dt id="model-double-exponential">Double exponential <span class="mi-year">1993</span></dt>
+          <dd>Adsorption proceeds in two parallel or sequential steps with distinct rate constants: typically a fast external surface step and a slow internal diffusion step. <span class="mi-p">Fitted parameters: q<sub>e</sub>, a<sub>1</sub>, k<sub>D1</sub>, k<sub>D2</sub>.</span> <cite>Wilczak, A. &amp; Keinath, T.M. (1993) Water Environ. Res. 65, 238-244.</cite></dd>
+        </dl>
+
+        <h3>Adsorption thermodynamics</h3>
+        <p>From isotherms measured at three or more temperatures, AdsorpFit
+        derives the standard Gibbs free energy change, the standard enthalpy
+        change and the standard entropy change by the van 't Hoff method, using
+        a genuinely dimensionless equilibrium constant. Six documented routes to
+        that dimensionless constant are offered, because a van 't Hoff plot
+        built on a constant that still carries units is the single most common
+        error in the adsorption literature. Isosteric heat of adsorption as a
+        function of surface loading, Arrhenius activation energy from fitted
+        rate constants, and sticking probability are also available.</p>
+      </div>
+    </div>
+<!-- SEO:MODELS end -->
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="fbrand">
+    <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener"
+       title="SWAT Lab, Sustainable Water Treatment Laboratory">
+      <span class="mark mark-swat" role="img" aria-label="SWAT Lab"></span></a>
+    <span class="vr"></span>
+    <a href="https://www.skku.edu/" target="_blank" rel="noopener"
+       title="Sungkyunkwan University">
+      <span class="mark mark-skku" role="img" aria-label="Sungkyunkwan University"></span></a>
+    <span class="vr"></span>
+    <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener" title="U-TOP Pioneer">
+      <span class="mark mark-utop" role="img" aria-label="U-TOP Pioneer"></span></a>
+    <span class="vr"></span>
+    <span><span data-i18n="brand.product">A product of</span>
+      <a href="http://www.swatlab.or.kr/" target="_blank" rel="noopener">SWAT Lab</a><span
+      data-i18n="foot.lab">, Sustainable Water Treatment Laboratory, Sungkyunkwan University</span></span>
+  </div>
+  <div class="contact">
+    <span data-i18n="foot.contact">Contact</span>
+    <b>Nguyen Duc Anh</b>
+    <a href="mailto:nguyenducanh@g.skku.edu">nguyenducanh@g.skku.edu</a>
+    <a href="tel:+821028169711">(+82)10-2816-9711</a>
+  </div>
+  <div class="tiny">
+    <span data-i18n="help.footPrivacy">All fitting runs locally in your browser, no data is uploaded.</span>
+    <span data-i18n="foot.opensource">Open source under the MIT licence.</span>
+  </div>
+</footer>
+
+<div class="toast-host" id="toasts"></div>
+
+<!-- Bump APP_VERSION on every release. The ?v= query is what forces
+     browsers, and the GitHub Pages CDN, to fetch new JS and CSS rather
+     than serving a cached copy. -->
+<script>window.APP_VERSION = "43";</script>
+<script src="js/i18n.js?v=43"></script>
+<script src="js/prefs.js?v=43"></script>
+<script src="js/presets.js?v=43"></script>
+<script src="js/layout.js?v=43"></script>
+<script src="js/water.js?v=43"></script>
+<script src="js/plot.js?v=43"></script>
+<script src="js/app.js?v=43"></script>
+</body>
+</html>
