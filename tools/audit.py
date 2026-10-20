@@ -149,7 +149,10 @@ def check_presets():
 def check_assets():
     total = 0
     for root, dirs, files in os.walk("."):
-        if any(s in root for s in (".git", "__pycache__")):
+        parts = root.split(os.sep)
+        # hidden directories and build caches are not part of the site
+        if any(x.startswith(".") or x == "__pycache__"
+               for x in parts if x not in (".", "")):
             continue
         for f in files:
             path = os.path.join(root, f)

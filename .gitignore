@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
+
+# local editor and tool settings
+.*/
+!.github/
 .DS_Store
 Thumbs.db
 
